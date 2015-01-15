@@ -7000,11 +7000,11 @@ static void smbchg_handle_hvdcp3_disable(struct smbchg_chip *chip)
 			queue_delayed_work(system_power_efficient_wq,
 				&chip->hvdcp_det_work,
 				msecs_to_jiffies(HVDCP_NOTIFY_MS));
-			if (chip->parallel.use_parallel_aicl) {
-				reinit_completion(&chip->hvdcp_det_done);
-				pr_smb(PR_MISC, "init hvdcp_det_done\n");
-			}
+		if (chip->parallel.use_parallel_aicl) {
+			reinit_completion(&chip->hvdcp_det_done);
+			pr_smb(PR_MISC, "init hvdcp_det_done\n");
 		}
+		
 	} else {
 		smbchg_change_usb_supply_type(chip, POWER_SUPPLY_TYPE_UNKNOWN);
 	}

@@ -1460,10 +1460,7 @@ static int ngd_notify_slaves(void *data)
 	}
 
 	while (!kthread_should_stop()) {
-<<<<<<< HEAD
-=======
 		set_current_state(TASK_INTERRUPTIBLE);
->>>>>>> c374caf4b23e... msm: Use interruptible wait to not affect load average
 		wait_for_completion_interruptible(&dev->qmi.slave_notify);
 		/* Probe devices for first notification */
 		if (!i) {
