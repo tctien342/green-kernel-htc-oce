@@ -1311,7 +1311,6 @@ int iscsi_target_start_negotiation(
 
        if (conn->sock) {
                struct sock *sk = conn->sock->sk;
-
 		write_lock_bh(&sk->sk_callback_lock);
 		set_bit(LOGIN_FLAGS_READY, &conn->login_flags);
 		set_bit(LOGIN_FLAGS_INITIAL_PDU, &conn->login_flags);
