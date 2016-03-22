@@ -555,7 +555,7 @@ static inline int check_entry_size_and_hooks(struct arpt_entry *e,
 	if (err)
 		return err;
 
-	
+	/* Check hooks & underflows */
 	for (h = 0; h < NF_ARP_NUMHOOKS; h++) {
 		if (!(valid_hooks & (1 << h)))
 			continue;
@@ -1205,7 +1205,7 @@ check_compat_entry_size_and_hooks(struct compat_arpt_entry *e,
 		return -EINVAL;
 	}
 
-	
+	/* For purposes of check_entry casting the compat entry is fine */
 	ret = check_entry((struct arpt_entry *)e);
 	if (ret)
 		return ret;
