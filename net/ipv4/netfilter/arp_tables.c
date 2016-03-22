@@ -339,6 +339,7 @@ unsigned int arpt_do_table(struct sk_buff *skb,
 		return verdict;
 }
 
+/* All zeroes == unconditional rule. */
 static inline bool unconditional(const struct arpt_entry *e)
 {
 	static const struct arpt_arp uncond;
@@ -376,7 +377,7 @@ static int mark_source_chains(const struct xt_table_info *newinfo,
 			e->comefrom
 				|= ((1 << hook) | (1 << NF_ARP_NUMHOOKS));
 
-			
+			/* Unconditional return/END. */
 			if ((unconditional(e) &&
 			     (strcmp(t->target.u.user.name,
 				     XT_STANDARD_TARGET) == 0) &&
