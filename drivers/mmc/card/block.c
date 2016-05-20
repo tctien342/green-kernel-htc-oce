@@ -3707,7 +3707,12 @@ static const struct mmc_fixup blk_fixups[] =
 	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_TOSHIBA, CID_OEMID_ANY,
 		  add_quirk_mmc, MMC_QUIRK_CMDQ_EMPTY_BEFORE_DCMD),
 
+	/*
+	 * Some MMC cards need longer data read timeout than indicated in CSD.
+	 */
 	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_MICRON, 0x200, add_quirk_mmc,
+		  MMC_QUIRK_LONG_READ_TIME),
+	MMC_FIXUP("008GE0", CID_MANFID_TOSHIBA, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_LONG_READ_TIME),
 
 	MMC_FIXUP("Q7XSAB", CID_MANFID_SAMSUNG, 0x100, add_quirk_mmc,
