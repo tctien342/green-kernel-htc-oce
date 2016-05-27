@@ -365,11 +365,18 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 		value = mfd->panel_info->brightness_max;
 
 	if (backlight_dimmer) {
-		if (value < 3)
-			bl_lvl = 1;
-		else
-			MDSS_BRIGHT_TO_BL_DIMMER(bl_lvl, value);
-	} else {
+		bl_lvl = MAX(backlight_min, mdss_backlight_trans(value, mfd->panel_info, true) - 120);
+ 	} else {
+		bl_lvl = MAX(backlight_min, mdss_backlight_trans(value, mfd->panel_info, true));
+ 	}
+
+	/* Change to burst backlight */
+	if (htc_is_burst_bl_on(mfd, value)) {
+		bl_lvl = mfd->panel_info->burst_bl_value;
+		pr_info("Change to burst bl =%d\n", bl_lvl);
+	}
+
+	if (bl_lvl < 0) {
 		/* This maps android backlight level 0 to 255 into
 		   driver backlight level 0 to bl_max with rounding */
 		MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
