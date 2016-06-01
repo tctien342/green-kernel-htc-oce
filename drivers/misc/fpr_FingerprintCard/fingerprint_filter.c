@@ -301,6 +301,22 @@ static bool fpf_input_filter(struct input_handle *handle,
 			input_sync(fpf_pwrdev);
 		}
 	}
+	}
+	if (fpf_switch == 1) {
+		// simple home button mode, user space handles behavior
+		if (value > 0) {
+			if (!screen_on) {
+				return false;
+			} else {
+				fpf_vib();
+				input_report_key(fpf_pwrdev, KEY_HOME, 1);
+				input_sync(fpf_pwrdev);
+			}
+		} else {
+			input_report_key(fpf_pwrdev, KEY_HOME, 0);
+			input_sync(fpf_pwrdev);
+		}
+	}
 	return true;
 }
 
