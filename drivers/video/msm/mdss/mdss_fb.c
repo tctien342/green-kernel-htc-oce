@@ -84,8 +84,6 @@
 			out = (12*v*v+1393*v+3060)/4465;\
 			} while (0)
 
-bool backlight_dimmer = false;
-module_param(backlight_dimmer, bool, 0755);
 
 /*
  * Time period for fps calulation in micro seconds.
@@ -96,6 +94,12 @@ module_param(backlight_dimmer, bool, 0755);
 static struct fb_info *fbi_list[MAX_FBI_LIST];
 static int fbi_list_index;
 
+#define MDSS_BRIGHT_TO_BL_DIM(out, v) do {\
+			out = (v*v+46000*v-3000000)/50000;\
+			} while (0)
+
+bool backlight_dimmer = false;
+module_param(backlight_dimmer, bool, 0755);
 static int backlight_min = 10;
 
 static u32 mdss_fb_pseudo_palette[16] = {
@@ -366,11 +370,15 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
 
-	if (backlight_dimmer) {
-		bl_lvl = MAX(backlight_min, mdss_backlight_trans(value, mfd->panel_info, true) - 100);
- 	} else {
-		bl_lvl = MAX(backlight_min, mdss_backlight_trans(value, mfd->panel_info, true));
- 	}
+	if (value > mfd->panel_info->brightness_max)
+		value = mfd->panel_info->brightness_max;
+
+	bl_lvl = mdss_backlight_trans(value, mfd->panel_info, true);
+
+	if (backlight_dimmer)
+		MDSS_BRIGHT_TO_BL_DIM(bl_lvl, bl_lvl);
+
+	bl_lvl = MAX(backlight_min, bl_lvl);
 
 	/* Change to burst backlight */
 	if (htc_is_burst_bl_on(mfd, value)) {
