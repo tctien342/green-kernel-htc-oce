@@ -331,3 +331,8 @@ config HTC_PNPMGR
 	  depends on PM
 	  ---help---
 	  Collect the sysfs files nodes for pnpmgr usage.
+
+config PM_SYNC_BEFORE_SUSPEND
+	bool "Sync file systems before suspend"
+	depends on PM
+	default n
