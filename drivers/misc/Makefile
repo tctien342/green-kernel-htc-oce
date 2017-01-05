@@ -83,3 +83,4 @@ obj-$(CONFIG_MEMORY_STATE_TIME) += memory_state_time.o
 
 obj-$(CONFIG_HTC_FLASHLIGHT) += htc_flashlight.o
 obj-$(CONFIG_HTC_MCUROUTE) += htc_mcuroute.o
+obj-y += fastchg.o
