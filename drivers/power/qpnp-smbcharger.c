@@ -51,6 +51,9 @@
 #define CONNECT_OTG  (0x03)
 #endif
 
+#include <linux/fastchg.h>
+
+/* Mask/Bit helpers */
 #define _SMB_MASK(BITS, POS) \
 	((unsigned char)(((1 << (BITS)) - 1) << (POS)))
 #define SMB_MASK(LEFT_BIT_POS, RIGHT_BIT_POS) \
@@ -2181,7 +2184,8 @@ static int smbchg_set_usb_current_max(struct smbchg_chip *chip,
 			}
 			chip->usb_max_current_ma = 500;
 		}
-		if (current_ma == CURRENT_900_MA) {
+		if ((force_fast_charge && current_ma == CURRENT_500_MA) ||
+				current_ma == CURRENT_900_MA) {
 			rc = smbchg_sec_masked_write(chip,
 					chip->usb_chgpth_base + CHGPTH_CFG,
 					CFG_USB_2_3_SEL_BIT, CFG_USB_3);
