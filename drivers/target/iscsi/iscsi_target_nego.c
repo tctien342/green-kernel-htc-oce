@@ -1328,7 +1328,6 @@ int iscsi_target_start_negotiation(
 	ret = iscsi_target_do_login(conn, login);
 	if (!ret && iscsi_target_sk_check_and_clear(conn, LOGIN_FLAGS_INITIAL_PDU))
 		ret = -1;
-
 	if (ret < 0) {
 		cancel_delayed_work_sync(&conn->login_work);
 		cancel_delayed_work_sync(&conn->login_cleanup_work);
