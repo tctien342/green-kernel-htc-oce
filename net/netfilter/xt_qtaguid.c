@@ -2393,12 +2393,9 @@ static int ctrl_cmd_untag(const char *input)
 	BUG_ON(!tag_ref_entry);
 	BUG_ON(tag_ref_entry->num_sock_tags <= 0);
 	spin_lock_bh(&uid_tag_data_tree_lock);
-	if (kernel)
-		pid = sock_tag_entry->pid;
-	else
-		pid = current->tgid;
+	current->pid = current->tgid;
 	pqd_entry = proc_qtu_data_tree_search(
-		&proc_qtu_data_tree, pid);
+		&proc_qtu_data_tree, current->pid);
 	/*
 	 * TODO: remove if, and start failing.
 	 * At first, we want to catch user-space code that is not
@@ -2440,10 +2437,6 @@ err_put:
 		 input, atomic_long_read(&el_socket->file->f_count) - 1);
 	/* Release the sock_fd that was grabbed by sockfd_lookup(). */
 	sockfd_put(el_socket);
-	return res;
-
-err:
-	CT_DEBUG("qtaguid: ctrl_untag(%s): done.\n", input);
 	return res;
 }
 
