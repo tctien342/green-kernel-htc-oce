@@ -389,3 +389,7 @@ obj-$(CONFIG_SND_SOC_TPA6130A2)	+= snd-soc-tpa6130a2.o
 #HTC_AUD_START
 obj-$(CONFIG_SND_SOC_TFA98XX) += tfa/
 #HTC_AUD_END
+
+
+#Sound Control
+obj-$(CONFIG_SOUND_CONTROL)	+= sound_control.o
