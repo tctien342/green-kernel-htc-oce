@@ -2848,7 +2848,6 @@ void set_speaker_boost(int vol_speaker_boost)
 {
 	// store new value
 	int default_speaker_val = get_speaker();
-	int boosted_speaker_val = vol_speaker_boost;
 	int tmp;
 	// set new values
 	tmp = (vol_speaker_boost * -1) + default_speaker_val;
