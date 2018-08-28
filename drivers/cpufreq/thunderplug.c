@@ -40,17 +40,17 @@ struct notifier_block lcd_worker;
 #define DRIVER_VERSION  2
 #define DRIVER_SUBVER 5
 
-#define CPU_LOAD_THRESHOLD        (60) //Msm8916 power up early at 55 % because already cpus are weak in load handling
+#define CPU_LOAD_THRESHOLD        (50) //Msm8916 power up early at 55 % because already cpus are weak in load handling
 
-#define DEF_SAMPLING_MS			(300)
+#define DEF_SAMPLING_MS			(80)
 
 static int sampling_time = DEF_SAMPLING_MS;
 
 static int load_threshold = CPU_LOAD_THRESHOLD;
 
-static int tplug_hp_enabled = 0;
+static int tplug_hp_enabled = 1;
 
-static int touch_boost_enabled = 0;
+static int touch_boost_enabled = 1;
 
 static struct workqueue_struct *tplug_wq;
 static struct delayed_work tplug_work;
