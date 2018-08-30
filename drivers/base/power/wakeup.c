@@ -15,28 +15,9 @@
 #include <linux/seq_file.h>
 #include <linux/debugfs.h>
 #include <linux/types.h>
-#include <linux/moduleparam.h>
 #include <trace/events/power.h>
 
 #include "power.h"
-#include <soc/qcom/htc_util.h>
-
-static bool enable_qcom_rx_wakelock_ws = true;
-module_param(enable_qcom_rx_wakelock_ws, bool, 0644);
-static bool enable_wlan_extscan_wl_ws = true;
-module_param(enable_wlan_extscan_wl_ws, bool, 0644);
-static bool enable_ipa_ws = true;
-module_param(enable_ipa_ws, bool, 0644);
-static bool enable_wlan_wow_wl_ws = false;
-module_param(enable_wlan_wow_wl_ws, bool, 0644);
-static bool enable_wlan_ws = false;
-module_param(enable_wlan_ws, bool, 0644);
-static bool enable_timerfd_ws = false;
-module_param(enable_timerfd_ws, bool, 0644);
-static bool enable_netlink_ws = false;
-module_param(enable_netlink_ws, bool, 0644);
-static bool enable_netmgr_wl_ws = false;
-module_param(enable_netmgr_wl_ws, bool, 0644);
 
 
 #ifdef CONFIG_BOEFFLA_WL_BLOCKER
@@ -412,106 +393,6 @@ int device_set_wakeup_enable(struct device *dev, bool enable)
 }
 EXPORT_SYMBOL_GPL(device_set_wakeup_enable);
 
-#ifdef CONFIG_PM_AUTOSLEEP
-static void update_prevent_sleep_time(struct wakeup_source *ws, ktime_t now)
-{
-	ktime_t delta = ktime_sub(now, ws->start_prevent_time);
-	ws->prevent_sleep_time = ktime_add(ws->prevent_sleep_time, delta);
-}
-#else
-static inline void update_prevent_sleep_time(struct wakeup_source *ws,
-					     ktime_t now) {}
-#endif
-
-/**
- * wakup_source_deactivate - Mark given wakeup source as inactive.
- * @ws: Wakeup source to handle.
- *
- * Update the @ws' statistics and notify the PM core that the wakeup source has
- * become inactive by decrementing the counter of wakeup events being processed
- * and incrementing the counter of registered wakeup events.
- */
-static void wakeup_source_deactivate(struct wakeup_source *ws)
-{
-	unsigned int cnt, inpr, cec;
-	ktime_t duration;
-	ktime_t now;
-
-	ws->relax_count++;
-	/*
-	 * __pm_relax() may be called directly or from a timer function.
-	 * If it is called directly right after the timer function has been
-	 * started, but before the timer function calls __pm_relax(), it is
-	 * possible that __pm_stay_awake() will be called in the meantime and
-	 * will set ws->active.  Then, ws->active may be cleared immediately
-	 * by the __pm_relax() called from the timer function, but in such a
-	 * case ws->relax_count will be different from ws->active_count.
-	 */
-	if (ws->relax_count != ws->active_count) {
-		ws->relax_count--;
-		return;
-	}
-
-	ws->active = false;
-
-	now = ktime_get();
-	duration = ktime_sub(now, ws->last_time);
-	ws->total_time = ktime_add(ws->total_time, duration);
-	if (ktime_to_ns(duration) > ktime_to_ns(ws->max_time))
-		ws->max_time = duration;
-
-	ws->last_time = now;
-	del_timer(&ws->timer);
-	ws->timer_expires = 0;
-
-	if (ws->autosleep_enabled)
-		update_prevent_sleep_time(ws, now);
-
-	/*
-	 * Increment the counter of registered wakeup events and decrement the
-	 * couter of wakeup events in progress simultaneously.
-	 */
-	cec = atomic_add_return(MAX_IN_PROGRESS, &combined_event_count);
-	trace_wakeup_source_deactivate(ws->name, cec);
-
-	split_counters(&cnt, &inpr);
-	if (!inpr && waitqueue_active(&wakeup_count_wait_queue))
-		wake_up(&wakeup_count_wait_queue);
-}
-
-static bool wakeup_source_blocker(struct wakeup_source *ws)
-{
-	unsigned int wslen = 0;
-
-	if (ws) {
-		wslen = strlen(ws->name);
-
-		if ((!enable_ipa_ws && !strncmp(ws->name, "IPA_WS", wslen)) ||
-			(!enable_wlan_extscan_wl_ws &&
-				!strncmp(ws->name, "wlan_extscan_wl", wslen)) ||
-			(!enable_qcom_rx_wakelock_ws &&
-				!strncmp(ws->name, "qcom_rx_wakelock", wslen)) ||
-			(!enable_wlan_ws &&
-				!strncmp(ws->name, "wlan", wslen)) ||
-			(!enable_netmgr_wl_ws &&
-				!strncmp(ws->name, "netmgr_wl", wslen)) ||
-			(!enable_timerfd_ws &&
-				!strncmp(ws->name, "[timerfd]", wslen)) ||
-			(!enable_netlink_ws &&
-				!strncmp(ws->name, "NETLINK", wslen))) {
-			if (ws->active) {
-				wakeup_source_deactivate(ws);
-				pr_info("forcefully deactivate wakeup source: %s\n",
-					ws->name);
-			}
-
-			return true;
-		}
-	}
-
-	return false;
-}
-
 /*
  * The functions below use the observation that each wakeup event starts a
  * period in which the system should not be suspended.  The moment this period
@@ -643,10 +524,6 @@ static void wakeup_source_report_event(struct wakeup_source *ws)
 #endif
 }
 
-#ifdef CONFIG_PM_DEBUG
-extern char wakelock_debug_buf[];
-#endif
-
 /**
  * __pm_stay_awake - Notify the PM core of a wakeup event.
  * @ws: Wakeup source object associated with the source of the event.
@@ -659,13 +536,6 @@ void __pm_stay_awake(struct wakeup_source *ws)
 
 	if (!ws)
 		return;
-
-#ifdef CONFIG_PM_DEBUG
-	if (!strncmp(ws->name, wakelock_debug_buf, sizeof(ws->name)-1)) {
-		pr_err("%s PID: %i requests wakelock %s", current->comm, current->pid, ws->name);
-		dump_stack();
-	}
-#endif
 
 	spin_lock_irqsave(&ws->lock, flags);
 
@@ -1142,35 +1012,6 @@ static int print_wakeup_source_stats(struct seq_file *m,
 
 	return ret;
 }
-
-#ifdef CONFIG_HTC_POWER_DEBUG
-void htc_print_active_wakeup_sources(bool print_embedded)
-{
-        struct wakeup_source *ws;
-        char output[512];
-        char piece[64];
-
-        rcu_read_lock();
-        memset(output, 0, sizeof(output));
-        list_for_each_entry_rcu(ws, &wakeup_sources, entry) {
-            if (ws->active) {
-                memset(piece, 0, sizeof(piece));
-                if (ws->timer_expires) {
-                    long timeout = ws->timer_expires - jiffies;
-                    if (timeout > 0) {
-                        snprintf(piece, sizeof(piece), " '%s', time left %ld ticks; ", ws->name, timeout);
-                        safe_strcat(output, piece);
-                    }
-                } else {
-                    snprintf(piece, sizeof(piece), " '%s' ", ws->name);
-                    safe_strcat(output, piece);
-                }
-            }
-        }
-        rcu_read_unlock();
-        k_pr_embedded_cond(print_embedded, "[K] wakeup sources: %s\n", output);
-}
-#endif
 
 /**
  * wakeup_sources_stats_show - Print wakeup sources statistics information.
