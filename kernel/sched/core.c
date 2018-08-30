@@ -4841,6 +4841,70 @@ unsigned long nr_running(void)
 	return sum;
 }
 
+unsigned long avg_cpu_nr_running(unsigned int cpu)
+{
+	unsigned int seqcnt, ave_nr_running;
+	struct rq *q = cpu_rq(cpu);
+	/*
+	 * Update average to avoid reading stalled value if there were
+	 * no run-queue changes for a long time. On the other hand if
+	 * the changes are happening right now, just read current value
+	 * directly.
+	 */
+	seqcnt = read_seqcount_begin(&q->ave_seqcnt);
+	ave_nr_running = do_avg_nr_running(q);
+	if (read_seqcount_retry(&q->ave_seqcnt, seqcnt)) {
+		read_seqcount_begin(&q->ave_seqcnt);
+		ave_nr_running = q->ave_nr_running;
+	}
+	return ave_nr_running;
+}
+EXPORT_SYMBOL(avg_cpu_nr_running);
+unsigned long get_avg_nr_running(unsigned int cpu)
+{
+	struct rq *q;
+	if (cpu >= nr_cpu_ids)
+		return 0;
+	q = cpu_rq(cpu);
+	return q->ave_nr_running;
+}
+unsigned long avg_nr_running(void)
+{
+	unsigned long i, sum = 0;
+	unsigned int seqcnt, ave_nr_running;
+	for_each_online_cpu(i) {
+		struct rq *q = cpu_rq(i);
+		/*
+		 * Update average to avoid reading stalled value if there were
+		 * no run-queue changes for a long time. On the other hand if
+		 * the changes are happening right now, just read current value
+		 * directly.
+		 */
+		seqcnt = read_seqcount_begin(&q->ave_seqcnt);
+		ave_nr_running = do_avg_nr_running(q);
+		if (read_seqcount_retry(&q->ave_seqcnt, seqcnt)) {
+			read_seqcount_begin(&q->ave_seqcnt);
+			ave_nr_running = q->ave_nr_running;
+		}
+		sum += ave_nr_running;
+	}
+	return sum;
+}
+EXPORT_SYMBOL(avg_nr_running);
+
+/*
+ * Check if only the current task is running on the cpu.
+ *
+ * Caution: this function does not check that the caller has disabled
+ * preemption, thus the result might have a time-of-check-to-time-of-use
+ * race.  The caller is responsible to use it correctly, for example:
+ *
+ * - from a non-preemptable section (of course)
+ *
+ * - from a thread that is bound to a single CPU
+ *
+ * - in a loop with very short iterations (e.g. a polling loop)
+ */
 bool single_task_running(void)
 {
 	return raw_rq()->nr_running == 1;
