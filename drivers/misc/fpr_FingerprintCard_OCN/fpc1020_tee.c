@@ -44,6 +44,12 @@
 #include <linux/regulator/consumer.h>
 #include <linux/wakelock.h>
 #include <soc/qcom/scm.h>
+
+#ifdef CONFIG_FINGERPRINT_BOOST
+#include <linux/display_state.h>
+#define KEY_FINGERPRINT 0x2ee
+#endif
+
 #ifdef CONFIG_FPC_HTC_DISABLE_CHARGING
 #include <linux/power/htc_battery.h>
 #endif
@@ -87,6 +93,10 @@ struct fpc1020_data {
 #endif
 #ifdef CONFIG_FPC_HTC_IRQ_LOGGING
         int irq_logging_enable;
+#endif
+
+#ifdef CONFIG_FINGERPRINT_BOOST
+	struct input_dev *input_dev;
 #endif
 
 
@@ -397,6 +407,32 @@ static const struct attribute_group attribute_group = {
 	.attrs = attributes,
 };
 
+#ifdef CONFIG_FINGERPRINT_BOOST
+static int fpc1020_input_init(struct fpc1020_data * fpc1020)
+{
+	int ret;
+	fpc1020->input_dev = input_allocate_device();
+	if (!fpc1020->input_dev) {
+		pr_err("fingerprint input boost allocation is fucked - 1 star\n");
+		ret = -ENOMEM;
+		goto exit;
+	}
+	fpc1020->input_dev->name = "fpc1020";
+	fpc1020->input_dev->evbit[0] = BIT(EV_KEY);
+	set_bit(KEY_FINGERPRINT, fpc1020->input_dev->keybit);
+	ret = input_register_device(fpc1020->input_dev);
+	if (ret) {
+		pr_err("fingerprint boost input registration is fucked - fixpls\n");
+		goto err_free_dev;
+	}
+	return 0;
+err_free_dev:
+	input_free_device(fpc1020->input_dev);
+exit:
+	return ret;
+}
+#endif
+
 #ifdef CONFIG_HTC_ID_PIN
 static int id_pin_detect(struct fpc1020_data *fp)
 {
@@ -466,6 +502,15 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 	}
 
 	sysfs_notify(&fpc1020->dev->kobj, NULL, dev_attr_irq.attr.name);
+
+#ifdef CONFIG_FINGERPRINT_BOOST
+	if (!is_display_on()) {
+		input_report_key(fpc1020->input_dev, KEY_FINGERPRINT, 1);
+		input_sync(fpc1020->input_dev);
+		input_report_key(fpc1020->input_dev, KEY_FINGERPRINT, 0);
+		input_sync(fpc1020->input_dev);
+	}
+#endif
 
 #ifdef CONFIG_FPC_HTC_RECORD_IRQ_COUNT
         fpc1020->irq_count++;
@@ -608,6 +653,12 @@ static int fpc1020_probe(struct platform_device *pdev)
 
 	/* Request that the interrupt should be wakeable */
 	enable_irq_wake(gpio_to_irq(fpc1020->irq_gpio));
+
+#ifdef CONFIG_FINGERPRINT_BOOST
+	rc = fpc1020_input_init(fpc1020);
+	if (rc)
+		goto exit;
+#endif
 
 	wake_lock_init(&fpc1020->ttw_wl, WAKE_LOCK_SUSPEND, "fpc_ttw_wl");
 
