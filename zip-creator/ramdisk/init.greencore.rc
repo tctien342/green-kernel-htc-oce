@@ -1,0 +1,109 @@
+# Copyright (c) 2017, Code Aurora Forum. All rights reserved.
+#
+# add support for spectrum
+import /init.spectrum.rc
+
+on property:sys.boot_completed=1
+
+#Default Profile
+#Based on Greencore Balanced
+
+#Set governor Interactive governor for the LITTLE and BIG cluster
+	write /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor "impulse"
+	write /sys/devices/system/cpu/cpu1/cpufreq/scaling_governor "impulse"
+	write /sys/devices/system/cpu/cpu2/cpufreq/scaling_governor "impulse"
+	write /sys/devices/system/cpu/cpu3/cpufreq/scaling_governor "impulse"
+
+#Tweak cpu
+	write /sys/module/msm_performance/parameters/cpu_max_freq "0:1500000 1:1500000 2:1600000 3:1600000"
+
+#Tweaking GPU
+	write /sys/class/kgsl/kgsl-3d0/max_gpuclk 510000000
+	write /sys/class/kgsl/kgsl-3d0/devfreq/adrenoboost 1
+
+#Tweaking Vibration
+	write /sys/class/timed_output/vibrator/voltage_level 1400
+
+#Set zen block I/O scheduler
+write /sys/block/sda/queue/scheduler zen
+
+#Enable autosmp hotplug
+    write /sys/module/autosmp/parameters/enabled Y
+
+#Enable intellithermal from faux123
+    write /sys/module/msm_thermal/parameters/enabled Y
+
+#Disable Core Control and Control VDD
+    write /sys/module/msm_thermal/core_control/enabled 0
+    write /sys/module/msm_thermal/vdd_restriction/enabled 0
+
+#Enable backlight dimmer
+    write /sys/module/mdss_fb/parameters/backlight_dimmer Y
+
+#Enable USB Fastcharge
+    write /sys/kernel/fast_charge/force_fast_charge 1	
+
+#Low memory killer
+	write /sys/module/lowmemorykiller/parameters/enable_adaptive_lmk 0
+	write /sys/module/lowmemorykiller/parameters/minfree "1536,3072,4096,21000,23000,25000"
+
+#Enable CPU power saving
+	write /sys/module/workqueue/parameters/power_efficient Y
+
+#Disable Gentle Fair Sleepers
+	write /sys/kernel/sched/gentle_fair_sleepers 1
+
+#Enable Arch Power
+	write /sys/kernel/sched/arch_power 1
+
+#Disable CRC
+	write /sys/module/mmc_core/parameters/use_spi_crc 0
+
+#Disable BCL
+	write /sys/devices/soc/soc:qcom,bcl/mode "-n disable"
+
+#Tweak HMP Scheduler to feed the Big cluster more tasks
+	write /proc/sys/kernel/sched_window_stats_policy 2
+	write /proc/sys/kernel/sched_upmigrate 95 
+	write /proc/sys/kernel/sched_downmigrate 80
+	write /proc/sys/kernel/sched_spill_nr_run 5 
+	write /proc/sys/kernel/sched_spill_load 96
+	write /proc/sys/kernel/sched_init_task_load 40
+	write /proc/sys/kernel/sched_heavy_task 96
+	write /proc/sys/kernel/sched_enable_power_aware 1
+	write /proc/sys/kernel/sched_upmigrate_min_nice 5 
+	write /proc/sys/kernel/sched_ravg_hist_size 4
+	write /proc/sys/kernel/sched_small_wakee_task_load 5 
+	write /proc/sys/kernel/sched_wakeup_load_threshold 110
+	write /proc/sys/kernel/sched_small_task 21 
+	write /proc/sys/kernel/sched_rt_runtime_us 950000
+	write /proc/sys/kernel/sched_rt_period_us 1000000
+	write /proc/sys/kernel/sched_migration_fixup 1 
+	write /proc/sys/kernel/sched_freq_dec_notify 410000
+	write /proc/sys/kernel/sched_freq_inc_notify 600000
+	write /proc/sys/kernel/sched_boost 0
+
+#Scheduler I/O 
+	write /sys/block/sda/queue/read_ahead_kb 512
+	write /sys/block/sde/queue/read_ahead_kb 512
+	write /sys/block/dm-0/queue/read_ahead_kb 512
+	write /sys/block/dm-1/queue/read_ahead_kb 512
+	write /sys/devices/virtual/block/dm-0/queue/iosched/async_read_expire 300
+	write /sys/devices/virtual/block/dm-0/queue/iosched/async_write_expire 3000
+	write /sys/devices/virtual/block/dm-0/queue/iosched/fifo_batch 14
+	write /sys/devices/virtual/block/dm-0/queue/iosched/sync_read_expire 644
+	write /sys/devices/virtual/block/dm-0/queue/iosched/syn_writec_expire 300
+
+#VM tweaks
+	write /proc/sys/vm/swappiness 30 
+	write /proc/sys/vm/vfs_cache_pressure 100
+	write /proc/sys/vm/dirty_ratio 80 
+	write /proc/sys/vm/dirty_background_ratio 50
+	write /proc/sys/vm/min_free_kbytes 4096
+
+#Entropy
+	write /proc/sys/kernel/random/read_wakeup_threshold 64
+	write /proc/sys/kernel/random/write_wakeup_threshold 896
+
+#TCP Values
+	write /proc/sys/net/ipv4/tcp_congestion_control westwood

@@ -137,7 +137,7 @@ static DEVICE_ATTR(earpiece_boost, 0664, earpiece_boost_show, earpiece_boost_sto
 static struct attribute *soundcontrol_attributes[] =
 {
 	&dev_attr_volume_boost.attr,
-//	&dev_attr_speaker_boost.attr,
+	//&dev_attr_speaker_boost.attr,
 	&dev_attr_mic_boost.attr,
 	&dev_attr_earpiece_boost.attr,
 	NULL

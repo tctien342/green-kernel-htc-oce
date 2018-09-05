@@ -84,8 +84,6 @@
 			out = (12*v*v+1393*v+3060)/4465;\
 			} while (0)
 
-bool backlight_dimmer = false;
-module_param(backlight_dimmer, bool, 0755);
 
 /*
  * Time period for fps calulation in micro seconds.
@@ -95,6 +93,14 @@ module_param(backlight_dimmer, bool, 0755);
 
 static struct fb_info *fbi_list[MAX_FBI_LIST];
 static int fbi_list_index;
+
+#define MDSS_BRIGHT_TO_BL_DIM(out, v) do {\
+			out = (v*v+46000*v-3000000)/50000;\
+			} while (0)
+
+bool backlight_dimmer = false;
+module_param(backlight_dimmer, bool, 0755);
+static int backlight_min = 10;
 
 static u32 mdss_fb_pseudo_palette[16] = {
 	0x00000000, 0xffffffff, 0xffffffff, 0xffffffff,
@@ -364,12 +370,23 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (value > mfd->panel_info->brightness_max)
 		value = mfd->panel_info->brightness_max;
 
-	if (backlight_dimmer) {
-		if (value < 3)
-			bl_lvl = 1;
-		else
-			MDSS_BRIGHT_TO_BL_DIMMER(bl_lvl, value);
-	} else {
+	if (value > mfd->panel_info->brightness_max)
+		value = mfd->panel_info->brightness_max;
+
+	bl_lvl = mdss_backlight_trans(mfd, value, &mfd->panel_info->brt_bl_table[0], true);
+
+	if (backlight_dimmer)
+		MDSS_BRIGHT_TO_BL_DIM(bl_lvl, bl_lvl);
+
+	bl_lvl = MAX(backlight_min, bl_lvl);
+
+	/* Change to burst backlight */
+	if (htc_is_burst_bl_on(mfd, value)) {
+		bl_lvl = mfd->panel_info->burst_bl_value;
+		pr_info("Change to burst bl =%d\n", bl_lvl);
+	}
+
+	if (bl_lvl < 0) {
 		/* This maps android backlight level 0 to 255 into
 		   driver backlight level 0 to bl_max with rounding */
 		MDSS_BRIGHT_TO_BL(bl_lvl, value, mfd->panel_info->bl_max,
