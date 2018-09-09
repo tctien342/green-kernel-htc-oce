@@ -29,7 +29,6 @@
 
 #define MDSS_PANEL_DEFAULT_VER 0xffffffffffffffff
 #define MDSS_PANEL_UNKNOWN_NAME "unknown"
-#endif
 
 #include "mdss_htc_util.h"
 
@@ -867,8 +866,6 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 		mdss_dba_utils_video_off(pinfo->dba_data);
 		mdss_dba_utils_hdcp_enable(pinfo->dba_data, false);
 	}
-
-	mdss_dsi_panel_off_hdmi(ctrl, pinfo);
 
 	display_on = false;
 end:
