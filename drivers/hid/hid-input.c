@@ -1062,12 +1062,28 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 		return;
 	}
 
+	/*
+	 * Ignore out-of-range values as per HID specification,
+	 * section 5.10 and 6.2.25, when NULL state bit is present.
+	 * When it's not, clamp the value to match Microsoft's input
+	 * driver as mentioned in "Required HID usages for digitizers":
+	 * https://msdn.microsoft.com/en-us/library/windows/hardware/dn672278(v=vs.85).asp
+	 *
+	 * The logical_minimum < logical_maximum check is done so that we
+	 * don't unintentionally discard values sent by devices which
+	 * don't specify logical min and max.
+	 */
 	if ((field->flags & HID_MAIN_ITEM_VARIABLE) &&
-	    (field->logical_minimum < field->logical_maximum) &&
-	    (value < field->logical_minimum ||
-	     value > field->logical_maximum)) {
-		dbg_hid("Ignoring out-of-range value %x\n", value);
-		return;
+	    (field->logical_minimum < field->logical_maximum)) {
+		if (field->flags & HID_MAIN_ITEM_NULL_STATE &&
+		    (value < field->logical_minimum ||
+		     value > field->logical_maximum)) {
+			dbg_hid("Ignoring out-of-range value %x\n", value);
+			return;
+		}
+		value = clamp(value,
+			      field->logical_minimum,
+			      field->logical_maximum);
 	}
 
 	if (!(field->flags & (HID_MAIN_ITEM_RELATIVE |
@@ -1077,9 +1093,8 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 	    value == field->value[usage->usage_index])
 		return;
 
-	printk(KERN_INFO "[HID] %s: usage->hid:%x, type:%d, code:%d, value:%d\n", __func__, usage->hid, usage->type, usage->code, value);
-	
-	if (usage->type == EV_KEY && !!test_bit(usage->code, input->key) != value)
+	/* report the usage code as scancode if the key status has changed */
+	if (usage->type == EV_KEY && (!!test_bit(usage->code, input->key)) != value)
 		input_event(input, EV_MSC, MSC_SCAN, usage->hid);
 
 	input_event(input, usage->type, usage->code, value);

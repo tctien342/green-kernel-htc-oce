@@ -233,8 +233,16 @@ retry:
 
 	fault = __do_page_fault(mm, addr, mm_flags, vm_flags, tsk);
 
-	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
+	/*
+	 * If we need to retry but a fatal signal is pending, handle the
+	 * signal first. We do not need to release the mmap_sem because it
+	 * would already be released in __lock_page_or_retry in mm/filemap.c.
+	 */
+	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
+		if (!user_mode(regs))
+			goto no_context;
 		return 0;
+	}
 
 
 	perf_sw_event(PERF_COUNT_SW_PAGE_FAULTS, 1, regs, addr);

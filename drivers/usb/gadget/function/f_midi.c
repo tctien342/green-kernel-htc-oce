@@ -204,6 +204,7 @@ static inline struct usb_request *midi_alloc_ep_req(struct usb_ep *ep,
 	return alloc_ep_req(ep, length, length);
 }
 
+
 static void midi_free_ep_req(struct usb_ep *ep, struct usb_request *req)
 {
 	kfree(req->buf);
@@ -362,7 +363,9 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	/* allocate a bunch of read buffers and queue them all at once. */
 	for (i = 0; i < midi->qlen && err == 0; i++) {
 		struct usb_request *req =
-			midi_alloc_ep_req(midi->out_ep, midi->buflen);
+			midi_alloc_ep_req(midi->out_ep,
+				max_t(unsigned, midi->buflen,
+					bulk_out_desc.wMaxPacketSize));
 		if (req == NULL)
 			return -ENOMEM;
 
