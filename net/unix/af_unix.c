@@ -867,15 +867,9 @@ fail:
 static int unix_mknod(struct dentry *dentry, struct path *path, umode_t mode,
 		      struct path *res)
 {
-	struct dentry *dentry;
-	struct path path;
 	int err = 0;
-	dentry = kern_path_create(AT_FDCWD, sun_path, &path, 0);
-	err = PTR_ERR(dentry);
-	if (IS_ERR(dentry))
-		return err;
 
-	err = security_path_mknod(&path, dentry, mode, 0);
+	err = security_path_mknod(path, dentry, mode, 0);
 
 	if (!err) {
 		err = vfs_mknod(d_inode(path->dentry), dentry, mode, 0);
