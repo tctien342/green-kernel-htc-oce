@@ -4415,7 +4415,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 				 * lest we get into a time out/reset loop
 				 */
 				if (r == 0 || (r == -ETIMEDOUT &&
-						retries == 0 &&
+						i == 0 &&
 						udev->speed > USB_SPEED_FULL))
 					break;
 			}

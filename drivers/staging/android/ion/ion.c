@@ -411,17 +411,6 @@ static struct ion_handle* pass_to_user(struct ion_handle *handle)
 	return ret;
 }
 
-static int user_ion_handle_put_nolock(struct ion_handle *handle)
-{
-	int ret;
-
-	if (--handle->user_ref_count == 0) {
-		ret = ion_handle_put_nolock(handle);
-	}
-
-	return ret;
-}
-
 static struct ion_handle *ion_handle_lookup(struct ion_client *client,
 					    struct ion_buffer *buffer)
 {

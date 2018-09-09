@@ -38,7 +38,6 @@
 #include <linux/kmemleak.h>
 #include <trace/events/cma.h>
 #include <linux/io.h>
->>>>>>> v3.18.121
 
 #include "cma.h"
 
@@ -73,11 +72,6 @@ static unsigned long cma_bitmap_aligned_offset(const struct cma *cma,
 {
 	return (cma->base_pfn & ((1UL << align_order) - 1))
 		>> cma->order_per_bit;
-}
-
-static unsigned long cma_bitmap_maxno(struct cma *cma)
-{
-	return cma->count >> cma->order_per_bit;
 }
 
 static unsigned long cma_bitmap_pages_to_bits(const struct cma *cma,
