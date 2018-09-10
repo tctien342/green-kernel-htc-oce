@@ -40,7 +40,6 @@
 #include <linux/usb/gadget.h>
 #include <linux/log2.h>
 #include <linux/configfs.h>
-#include <linux/switch.h>	// ++ 2015/10/23 USB Team, PCN00026 ++
 
 /* FUNCTION_SUSPEND: suspend options from usb 3.0 spec Table 9-7 */
 #define FUNC_SUSPEND_OPT_SUSP_MASK BIT(0)
@@ -60,6 +59,9 @@
 
 /* big enough to hold our biggest descriptor */
 #define USB_COMP_EP0_BUFSIZ	4096
+
+/* OS feature descriptor length <= 4kB */
+#define USB_COMP_EP0_OS_DESC_BUFSIZ	4096
 
 #define USB_MS_TO_HS_INTERVAL(x)	(ilog2((x * 1000 / 125)) + 1)
 struct usb_configuration;
@@ -499,12 +501,6 @@ struct usb_composite_dev {
 	struct list_head		configs;
 	struct list_head		gstrings;
 	struct usb_composite_driver	*driver;
-/*++ 2015/10/23, USB Team, PCN00026 ++*/
-	struct switch_dev		sw_function_switch_on;
-	struct switch_dev		sw_function_switch_off;
-/*-- 2015/10/23, USB Team, PCN00026 --*/
-	struct switch_dev		sw_connect2pc;	// ++ 2015/11/16 USB Team, PCN00038  ++
-
 	u8				next_string_id;
 	char				*def_manufacturer;
 

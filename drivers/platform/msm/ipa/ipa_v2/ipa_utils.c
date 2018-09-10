@@ -962,7 +962,7 @@ int ipa2_get_ep_mapping(enum ipa_client_type client)
 
 void ipa2_set_client(int index, enum ipacm_client_enum client, bool uplink)
 {
-	if (client >= IPACM_CLIENT_MAX || client < IPACM_CLIENT_USB) {
+	if (client > IPACM_CLIENT_MAX || client < IPACM_CLIENT_USB) {
 		IPAERR("Bad client number! client =%d\n", client);
 	} else if (index >= IPA_MAX_NUM_PIPES || index < 0) {
 		IPAERR("Bad pipe index! index =%d\n", index);
@@ -5244,9 +5244,8 @@ void ipa_suspend_apps_pipes(bool suspend)
 	cfg.ipa_ep_suspend = suspend;
 
 	ipa_ep_idx = ipa_get_ep_mapping(IPA_CLIENT_APPS_LAN_CONS);
-	if(ipa_ep_idx >= 0)
-		ep = &ipa_ctx->ep[ipa_ep_idx];
-	if (ep && ep->valid) {
+	ep = &ipa_ctx->ep[ipa_ep_idx];
+	if (ep->valid) {
 		ipa2_cfg_ep_ctrl(ipa_ep_idx, &cfg);
 		/* Check if the pipes are empty. */
 		ret = sps_is_pipe_empty(ep->ep_hdl, &lan_empty);

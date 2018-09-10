@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2009-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2009-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -31,7 +31,6 @@
 #define SOCINFO_VERSION_MAJOR(ver) (((ver) & 0xffff0000) >> 16)
 #define SOCINFO_VERSION_MINOR(ver) ((ver) & 0x0000ffff)
 #define SOCINFO_VERSION(maj, min)  ((((maj) & 0xffff) << 16)|((min) & 0xffff))
-#define SOCINFO_VERSION_DBG(ver) ((ver) & 0x0000000f)
 
 #ifdef CONFIG_OF
 #define of_board_is_cdp()	of_machine_is_compatible("qcom,cdp")
@@ -216,6 +215,7 @@ enum msm_cpu {
 	MSM_CPU_9650,
 	MSM_CPU_COBALT,
 	SDX_CPU_20,
+	MSM_CPU_9150,
 };
 
 struct msm_soc_info {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -22,7 +22,6 @@
 #include <linux/msm-bus.h>
 #include <linux/msm-bus-board.h>
 #include "mdss_mdp_pp_cache_config.h"
-#include "mdss_htc_util.h"
 
 struct mdp_csc_cfg mdp_csc_8bit_convert[MDSS_MDP_MAX_CSC] = {
 	[MDSS_MDP_CSC_YUV2RGB_601L] = {
@@ -1577,11 +1576,16 @@ int mdss_mdp_scaler_lut_cfg(struct mdp_scale_data_v2 *scaler,
 	};
 
 	mdata = mdss_mdp_get_mdata();
+
+	mutex_lock(&mdata->scaler_off->scaler_lock);
+
 	lut_tbl = &mdata->scaler_off->lut_tbl;
 	if ((!lut_tbl) || (!lut_tbl->valid)) {
+		mutex_unlock(&mdata->scaler_off->scaler_lock);
 		pr_err("%s:Invalid QSEED3 LUT TABLE\n", __func__);
 		return -EINVAL;
 	}
+
 	if ((scaler->lut_flag & SCALER_LUT_DIR_WR) ||
 		(scaler->lut_flag & SCALER_LUT_Y_CIR_WR) ||
 		(scaler->lut_flag & SCALER_LUT_UV_CIR_WR) ||
@@ -1631,6 +1635,8 @@ int mdss_mdp_scaler_lut_cfg(struct mdp_scale_data_v2 *scaler,
 	if (scaler->lut_flag & SCALER_LUT_SWAP)
 		writel_relaxed(BIT(0), MDSS_MDP_REG_SCALER_COEF_LUT_CTRL +
 				offset);
+
+	mutex_unlock(&mdata->scaler_off->scaler_lock);
 
 	return 0;
 }
@@ -2564,7 +2570,6 @@ int mdss_mdp_pp_setup_locked(struct mdss_mdp_ctl *ctl)
 	mdata = ctl->mdata;
 	/* treat fb_num the same as block logical id*/
 	disp_num = ctl->mfd->index;
-	mdata = ctl->mdata;
 
 	mixer_cnt = mdss_mdp_get_ctl_mixers(disp_num, mixer_id);
 	if (!mixer_cnt) {
@@ -3658,12 +3663,8 @@ pcc_clk_off:
 					config->version, ret);
 				ret = -EFAULT;
 				goto pcc_config_exit;
-			} else {
-				/* HTC: display calibration for RGB*/
-				htc_update_rgb_cali_data(mfd, &mdss_pp_res->pcc_disp_cfg[disp_num]);
-
+			} else
 				goto pcc_set_dirty;
-			}
 		}
 		mdss_pp_res->pcc_disp_cfg[disp_num] = *config;
 pcc_set_dirty:

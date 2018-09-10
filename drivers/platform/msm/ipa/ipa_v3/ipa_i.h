@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -64,6 +64,9 @@
 #define IPA_MAX_STATUS_STAT_NUM 30
 
 #define IPA_IPC_LOG_PAGES 50
+
+#define IPA_PM_THRESHOLD_MAX 2
+#define IPA_MAX_NUM_REQ_CACHE 10
 
 #define IPADBG(fmt, args...) \
 	do { \
@@ -574,6 +577,8 @@ struct ipa3_status_stats {
  * @disconnect_in_progress: Indicates client disconnect in progress.
  * @qmi_request_sent: Indicates whether QMI request to enable clear data path
  *					request is sent or not.
+ * @client_lock_unlock: callback function to take mutex lock/unlock for USB
+ *				clients
  */
 struct ipa3_ep_context {
 	int valid;
@@ -610,6 +615,9 @@ struct ipa3_ep_context {
 	u32 uc_offload_state;
 	bool disconnect_in_progress;
 	u32 qmi_request_sent;
+	bool ep_delay_set;
+
+	int (*client_lock_unlock)(bool is_lock);
 
 	/* sys MUST be the last element of this struct */
 	struct ipa3_sys_context *sys;
@@ -1103,6 +1111,11 @@ struct ipa_dma_task_info {
 	struct ipahal_imm_cmd_pyld *cmd_pyld;
 };
 
+struct ipa_cne_evt {
+	struct ipa_wan_msg wan_msg;
+	struct ipa_msg_meta msg_meta;
+};
+
 /**
  * struct ipa3_context - IPA context
  * @class: pointer to the struct class
@@ -1330,6 +1343,9 @@ struct ipa3_context {
 	u32 ipa_tz_unlock_reg_num;
 	struct ipa_tz_unlock_reg_info *ipa_tz_unlock_reg;
 	struct ipa_dma_task_info dma_task_info;
+	struct ipa_cne_evt ipa_cne_evt_req_cache[IPA_MAX_NUM_REQ_CACHE];
+	int num_ipa_cne_evt_req;
+	struct mutex ipa_cne_evt_lock;
 };
 
 /**
@@ -1360,6 +1376,7 @@ struct ipa3_plat_drv_res {
 	bool ipa_bam_remote_mode;
 	bool modem_cfg_emb_pipe_flt;
 	bool ipa_wdi2;
+	u32 default_threshold[IPA_PM_THRESHOLD_MAX];
 	bool use_64_bit_dma_mask;
 	u32 wan_rx_ring_size;
 	u32 lan_rx_ring_size;
@@ -1368,6 +1385,7 @@ struct ipa3_plat_drv_res {
 	bool apply_rg10_wa;
 	bool gsi_ch20_wa;
 	bool tethered_flow_control;
+	bool ipa_mhi_dynamic_config;
 	u32 ipa_tz_unlock_reg_num;
 	struct ipa_tz_unlock_reg_info *ipa_tz_unlock_reg;
 };
@@ -1508,6 +1526,14 @@ int ipa3_xdci_start(u32 clnt_hdl, u8 xferrscidx, bool xferrscidx_valid);
 int ipa3_xdci_connect(u32 clnt_hdl);
 
 int ipa3_xdci_disconnect(u32 clnt_hdl, bool should_force_clear, u32 qmi_req_id);
+
+void ipa3_xdci_ep_delay_rm(u32 clnt_hdl);
+void ipa3_register_lock_unlock_callback(int (*client_cb)(bool), u32 ipa_ep_idx);
+void ipa3_deregister_lock_unlock_callback(u32 ipa_ep_idx);
+int ipa3_set_reset_client_prod_pipe_delay(bool set_reset,
+		enum ipa_client_type client);
+int ipa3_set_reset_client_cons_pipe_sus_holb(bool set_reset,
+		enum ipa_client_type client);
 
 int ipa3_xdci_suspend(u32 ul_clnt_hdl, u32 dl_clnt_hdl,
 	bool should_force_clear, u32 qmi_req_id, bool is_dpl);
@@ -2001,6 +2027,8 @@ void ipa3_uc_register_handlers(enum ipa3_hw_features feature,
 			      struct ipa3_uc_hdlrs *hdlrs);
 int ipa3_create_nat_device(void);
 int ipa3_uc_notify_clk_state(bool enabled);
+int ipa3_dma_setup(void);
+void ipa3_dma_shutdown(void);
 void ipa3_dma_async_memcpy_notify_cb(void *priv,
 		enum ipa_dp_evt_type evt, unsigned long data);
 

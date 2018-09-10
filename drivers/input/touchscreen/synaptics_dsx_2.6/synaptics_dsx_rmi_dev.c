@@ -648,10 +648,6 @@ static ssize_t rmidev_write(struct file *filp, const char __user *buf,
 
 	if (count > (REG_ADDR_LIMIT - *f_pos))
 		count = REG_ADDR_LIMIT - *f_pos;
-	if (count == 0) {
-		retval = 0;
-		goto unlock;
-	}
 
 	if (count == 0) {
 		retval = 0;
@@ -660,7 +656,7 @@ static ssize_t rmidev_write(struct file *filp, const char __user *buf,
 	rmidev_allocate_buffer(count);
 
 	if (copy_from_user(rmidev->tmpbuf, buf, count)) {
-		retval = -EFAULT;
+		return -EFAULT;
 		goto unlock;
 	}
 
@@ -673,6 +669,7 @@ static ssize_t rmidev_write(struct file *filp, const char __user *buf,
 
 unlock:
 	mutex_unlock(&(dev_data->file_mutex));
+
 	return retval;
 }
 

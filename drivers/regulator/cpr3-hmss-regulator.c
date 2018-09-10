@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -88,8 +88,9 @@ struct cpr3_msm8996_hmss_fuses {
  * Fuse combos 0 -  7 map to CPR fusing revision 0 - 7 with speed bin fuse = 0.
  * Fuse combos 8 - 15 map to CPR fusing revision 0 - 7 with speed bin fuse = 1.
  * Fuse combos 16 - 23 map to CPR fusing revision 0 - 7 with speed bin fuse = 2.
+ * Fuse combos 24 - 31 map to CPR fusing revision 0 - 7 with speed bin fuse = 3.
  */
-#define CPR3_MSM8996_HMSS_FUSE_COMBO_COUNT	24
+#define CPR3_MSM8996_HMSS_FUSE_COMBO_COUNT	32
 
 /*
  * Constants which define the name of each fuse corner.  Note that no actual
@@ -1705,31 +1706,6 @@ static struct of_device_id cpr_regulator_match_table[] = {
 	{}
 };
 
-u64* htc_target_quot[2] = {NULL};
-int htc_target_quot_len = 0;
-static void bak_htc_target_quot(struct cpr3_controller *ctrl)
-{
-	struct cpr3_msm8996_hmss_fuses *fuse;
-	struct cpr3_thread *thread;
-	struct cpr3_regulator *vreg;
-	int i, size;
-
-	/* The number of target_quot array should be same with cpr thread counter */
-	size = sizeof(htc_target_quot)/sizeof(u64);
-	if (size != ctrl->thread_count) {
-		WARN_ON(1);
-		return;
-	}
-
-	htc_target_quot_len = MSM8996_HMSS_FUSE_CORNERS;
-	for (i = 0; i < ctrl->thread_count; i++) {
-		thread = &ctrl->thread[i];
-		vreg = thread->vreg;
-		fuse = vreg->platform_fuses;
-		htc_target_quot[i] = fuse->target_quot;
-	}
-}
-
 static int cpr3_hmss_regulator_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -1820,7 +1796,6 @@ static int cpr3_hmss_regulator_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, ctrl);
-	bak_htc_target_quot(ctrl);
 
 	return cpr3_regulator_register(pdev, ctrl);
 }

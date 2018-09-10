@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -152,43 +152,6 @@ int msm_ion_do_cache_op(struct ion_client *client, struct ion_handle *handle,
 	return ion_do_cache_op(client, handle, vaddr, 0, len, cmd);
 }
 EXPORT_SYMBOL(msm_ion_do_cache_op);
-
-static atomic_t ion_alloc_mem_usages[ION_USAGE_MAX]
-			= {[0 ... ION_USAGE_MAX-1] = ATOMIC_INIT(0)};
-
-static inline atomic_t* ion_get_meminfo(const enum ion_heap_mem_usage usage)
-{
-	return (usage < ION_USAGE_MAX) ?
-			&ion_alloc_mem_usages[usage] : NULL;
-}
-
-void ion_alloc_inc_usage(const enum ion_heap_mem_usage usage,
-			 const size_t size)
-{
-	atomic_t * const ion_alloc_usage = ion_get_meminfo(usage);
-
-	if (ion_alloc_usage)
-		atomic_add(size, ion_alloc_usage);
-}
-EXPORT_SYMBOL(ion_alloc_inc_usage);
-
-void ion_alloc_dec_usage(const enum ion_heap_mem_usage usage,
-			 const size_t size)
-{
-	atomic_t * const ion_alloc_usage = ion_get_meminfo(usage);
-
-	if (ion_alloc_usage)
-		atomic_sub(size, ion_alloc_usage);
-}
-EXPORT_SYMBOL(ion_alloc_dec_usage);
-
-uintptr_t msm_ion_heap_meminfo(const bool is_total)
-{
-	atomic_t * const ion_alloc_usage = ion_get_meminfo(
-						is_total? ION_TOTAL : ION_IN_USE);
-	return ion_alloc_usage? atomic_read(ion_alloc_usage) * PAGE_SIZE : 0;
-}
-EXPORT_SYMBOL(msm_ion_heap_meminfo);
 
 static int ion_no_pages_cache_ops(struct ion_client *client,
 			struct ion_handle *handle,
@@ -366,7 +329,7 @@ int ion_do_cache_op(struct ion_client *client, struct ion_handle *handle,
 	if (!ION_IS_CACHED(flags))
 		return 0;
 
-	if (flags & ION_FLAG_SECURE)
+	if (get_secure_vmid(flags) > 0)
 		return 0;
 
 	table = ion_sg_table(client, handle);
@@ -687,27 +650,6 @@ int get_secure_vmid(unsigned long flags)
 		return VMID_CP_APP;
 	return -EINVAL;
 }
-
-unsigned long get_secure_vmidflag(int vmid)
-{
-	if (vmid == VMID_CP_TOUCH)
-		return ION_FLAG_CP_TOUCH;
-	if (vmid == VMID_CP_BITSTREAM)
-		return ION_FLAG_CP_BITSTREAM;
-	if (vmid == VMID_CP_PIXEL)
-		return ION_FLAG_CP_PIXEL;
-	if (vmid == VMID_CP_NON_PIXEL)
-		return ION_FLAG_CP_NON_PIXEL;
-	if (vmid == VMID_CP_CAMERA)
-		return ION_FLAG_CP_CAMERA;
-	if (vmid == VMID_CP_SEC_DISPLAY)
-		return ION_FLAG_CP_SEC_DISPLAY;
-	if (vmid == VMID_CP_APP)
-		return ION_FLAG_CP_APP;
-
-	return 0;
-}
-
 /* fix up the cases where the ioctl direction bits are incorrect */
 static unsigned int msm_ion_ioctl_dir(unsigned int cmd)
 {
@@ -771,11 +713,11 @@ long msm_ion_custom_ioctl(struct ion_client *client,
 
 		down_read(&mm->mmap_sem);
 
-		start = (unsigned long) data.flush_data.vaddr;
-		end = (unsigned long) data.flush_data.vaddr
-			+ data.flush_data.length;
+		start = (unsigned long)data.flush_data.vaddr +
+			data.flush_data.offset;
+		end = start + data.flush_data.length;
 
-		if (start && check_vaddr_bounds(start, end)) {
+		if (check_vaddr_bounds(start, end)) {
 			pr_err("%s: virtual address %pK is out of bounds\n",
 				__func__, data.flush_data.vaddr);
 			ret = -EINVAL;

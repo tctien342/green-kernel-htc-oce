@@ -233,6 +233,8 @@ struct msm_mdp_interface {
 				int dest_ctrl);
 	int (*input_event_handler)(struct msm_fb_data_type *mfd);
 	int (*pp_release_fnc)(struct msm_fb_data_type *mfd);
+	void (*signal_retire_fence)(struct msm_fb_data_type *mfd,
+					int retire_cnt);
 	void *private1;
 };
 
@@ -366,20 +368,6 @@ struct msm_fb_data_type {
 	bool pending_switch;
 	struct mutex switch_lock;
 	struct input_handler *input_handler;
-
-	// compass notifier for workaround
-	struct notifier_block compass_notifier_block;
-
-	u32 bl2_level;
-	u32 bl2_scale;
-	u32 unset_bl2_level;
-	u32 bl2_level_scaled;
-	u32 bl2_min;
-	bool bl_sync;
-	struct mutex aod_lock;
-
-	/* HTC: store last brightness value for backlight ctrl 1 calibration */
-	u32 last_bri1;
 };
 
 static inline void mdss_fb_update_notify_update(struct msm_fb_data_type *mfd)
@@ -448,11 +436,6 @@ static inline bool mdss_fb_is_power_on_ulp(struct msm_fb_data_type *mfd)
 	return mdss_panel_is_power_on_ulp(mfd->panel_power_state);
 }
 
-static inline bool mdss_fb_is_power_on_standby(struct msm_fb_data_type *mfd)
-{
-	return (mfd->panel_info->aod.power_state != FB_AOD_OFF);
-}
-
 static inline bool mdss_fb_is_hdmi_primary(struct msm_fb_data_type *mfd)
 {
 	return (mfd && (mfd->index == 0) &&
@@ -487,6 +470,4 @@ void mdss_fb_report_panel_dead(struct msm_fb_data_type *mfd);
 void mdss_panelinfo_to_fb_var(struct mdss_panel_info *pinfo,
 						struct fb_var_screeninfo *var);
 void mdss_fb_calc_fps(struct msm_fb_data_type *mfd);
-
-int mdss_backlight_trans(struct msm_fb_data_type *mfd, int val, struct htc_backlight1_table *table, int brightness_to_bl);
 #endif /* MDSS_FB_H */

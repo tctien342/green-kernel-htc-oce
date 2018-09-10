@@ -8,7 +8,6 @@
 #include <linux/slab.h>
 #include <trace/events/sched.h>
 
-
 int sched_rr_timeslice = RR_TIMESLICE;
 
 static int do_sched_rt_period_timer(struct rt_bandwidth *rt_b, int overrun);
@@ -820,6 +819,8 @@ static int do_sched_rt_period_timer(struct rt_bandwidth *rt_b, int overrun)
 		struct rq *rq = rq_of_rt_rq(rt_rq);
 
 		raw_spin_lock(&rq->lock);
+		update_rq_clock(rq);
+
 		if (rt_rq->rt_time) {
 			u64 runtime;
 
@@ -1719,9 +1720,6 @@ static int find_lowest_rq_hmp(struct task_struct *task)
 
 		for_each_cpu(i, &candidate_mask) {
 			if (sched_cpu_high_irqload(i))
-				continue;
-
-			if (cpu_rq(i)->budget == 0)
 				continue;
 
 			cpu_load = cpu_rq(i)->hmp_stats.cumulative_runnable_avg;

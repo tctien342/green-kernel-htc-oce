@@ -29,6 +29,7 @@ enum android_function_index {
 	ANDROID_DIAG,
 	ANDROID_QDSS_BAM,
 	ANDROID_SERIAL,
+	ANDROID_SERIAL_CONFIG2,
 	ANDROID_CCID,
 	ANDROID_ACM,
 	ANDROID_MTP,
@@ -74,6 +75,8 @@ static enum android_function_index name_to_func_idx(const char *name)
 		return ANDROID_QDSS_BAM;
 	if (!strncasecmp("SERIAL", name, FUNC_NAME_LEN))
 		return ANDROID_SERIAL;
+	if (!strncasecmp("SERIAL_CONFIG2", name, FUNC_NAME_LEN))
+		return ANDROID_SERIAL_CONFIG2;
 	if (!strncasecmp("CCID", name, FUNC_NAME_LEN))
 		return ANDROID_CCID;
 	if (!strncasecmp("ACM", name, FUNC_NAME_LEN))
@@ -97,7 +100,7 @@ static enum android_function_index name_to_func_idx(const char *name)
 	if (!strncasecmp("AUDIO_SOURCE", name, FUNC_NAME_LEN))
 		return ANDROID_AUDIO_SRC;
 	if (!strncasecmp("CHARGING", name, FUNC_NAME_LEN))
-		return ANDROID_AUDIO_SRC;
+		return ANDROID_CHARGER;
 	if (!strncasecmp("MIDI", name, FUNC_NAME_LEN))
 		return ANDROID_MIDI;
 	if (!strncasecmp("RNDIS_GSI", name, FUNC_NAME_LEN))
@@ -126,20 +129,6 @@ struct android_usb_platform_data {
 	int (*update_pid_and_serial_num)(uint32_t, const char *);
 	u32 pm_qos_latency[MAX_VOTES];
 	u8 usb_core_id;
-/*++ 2015/06/23 USB Team, PCN00004 ++*/
-	/* For multiple serial function support
-	 * Ex: "tty:serial[,sdio:modem_mdm][,smd:modem]"
-	 */
-	const char *fserial_init_string;
-/*-- 2015/06/23 USB Team, PCN00004 --*/
-/*++ 2015/06/29 USB Team, PCN00005 ++*/
-	const char *diag_client_interface;
-	const char *rmnet_transports_interface;
-/*-- 2015/06/29 USB Team, PCN00005 --*/
-/*++ 2015/10/27, USB Team, PCN00001 ++*/
-	bool cdrom;
-	u32 nluns;
-/*-- 2015/10/27, USB Team, PCN00001 --*/
 };
 
 extern int gport_setup(struct usb_configuration *c);
@@ -156,35 +145,5 @@ extern bool gserial_is_dun_w_softap_active(void);
 int acm_port_setup(struct usb_configuration *c);
 void acm_port_cleanup(void);
 int acm_init_port(int port_num, const char *name);
-
-/*++ 2015/06/23 USB Team, PCN00004 ++*/
-enum fserial_func_type {
-	USB_FSER_FUNC_NONE,
-	USB_FSER_FUNC_SERIAL,
-	USB_FSER_FUNC_MODEM,
-	USB_FSER_FUNC_MODEM_MDM,
-	USB_FSER_FUNC_ACM,
-	USB_FSER_FUNC_AUTOBOT,
-};
-
-enum fserial_func_type serial_str_to_func_type(const char *name)
-{
-	if (!name)
-		return USB_FSER_FUNC_NONE;
-
-	if (!strcasecmp("MODEM", name))
-		return USB_FSER_FUNC_MODEM;
-	if (!strcasecmp("MODEM_MDM", name))
-		return USB_FSER_FUNC_MODEM_MDM;
-	if (!strcasecmp("SERIAL", name))
-		return USB_FSER_FUNC_SERIAL;
-	if (!strcasecmp("ACM", name))
-		return USB_FSER_FUNC_ACM;
-	if (!strcasecmp("AUTOBOT", name))
-		return USB_FSER_FUNC_AUTOBOT;
-
-	return USB_FSER_FUNC_NONE;
-}
-/*-- 2015/06/23 USB Team, PCN00004 --*/
 
 #endif	/* __LINUX_USB_ANDROID_H */

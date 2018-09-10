@@ -28,12 +28,6 @@
 #define SSUSB_GADGET_VBUS_DRAW_UNITS 8
 #define HSUSB_GADGET_VBUS_DRAW_UNITS 2
 
-/*++ 2015/11/16 USB Team, PCN00038 ++*/
-#define MAC_FIRST_DT_LENGTH  18
-#define WIN_LINUX_FIRST_DT1_LENGTH 8
-#define WIN_LINUX_FIRST_DT2_LENGTH 64
-/*-- 2015/11/16 USB Team, PCN00038 --*/
-
 /*
  * Based on enumerated USB speed, draw power with set_config and resume
  * HSUSB: 500mA, SSUSB: 900mA
@@ -68,17 +62,6 @@ struct usb_os_string {
  * objects, and a "usb_composite_driver" by gluing them together along
  * with the relevant device-wide data.
  */
-
-/*++ 2015/07/08 USB Team, PCN00011 ++*/
-enum {
-	OS_NOT_YET,
-	OS_MAC,
-	OS_LINUX,
-	OS_WINDOWS,
-};
-
-static int os_type;
-/*-- 2015/07/08 USB Team, PCN00011 --*/
 
 static struct usb_gadget_strings **get_containers_gs(
 		struct usb_gadget_string_container *uc)
@@ -137,7 +120,6 @@ int config_ep_by_speed(struct usb_gadget *g,
 			struct usb_function *f,
 			struct usb_ep *_ep)
 {
-	struct usb_composite_dev	*cdev = get_gadget_data(g);
 	struct usb_endpoint_descriptor *chosen_desc = NULL;
 	struct usb_descriptor_header **speed_desc = NULL;
 
@@ -204,8 +186,12 @@ ep_found:
 			_ep->maxburst = comp_desc->bMaxBurst + 1;
 			break;
 		default:
-			if (comp_desc->bMaxBurst != 0)
+			if (comp_desc->bMaxBurst != 0) {
+				struct usb_composite_dev *cdev;
+
+				cdev = get_gadget_data(g);
 				ERROR(cdev, "ep0 bMaxBurst must be 0\n");
+			}
 			_ep->maxburst = 1;
 			break;
 		}
@@ -501,12 +487,6 @@ static u8 encode_bMaxPower(enum usb_device_speed speed,
 	}
 }
 
-/*++ 2015/07/08 USB Team, PCN00011 ++*/
-extern struct usb_descriptor_header *ss_mtp_descs[];
-extern struct usb_descriptor_header *hs_mtp_descs[];
-extern struct usb_descriptor_header *fs_mtp_descs[];
-/*-- 2015/07/08 USB Team, PCN00011 --*/
-
 static int config_buf(struct usb_configuration *config,
 		enum usb_device_speed speed, void *buf, u8 type)
 {
@@ -545,24 +525,12 @@ static int config_buf(struct usb_configuration *config,
 		switch (speed) {
 		case USB_SPEED_SUPER:
 			descriptors = f->ss_descriptors;
-/*++ 2015/07/08 USB Team, PCN00011 ++*/
-			if (!strcmp("mtp", f->name) && (os_type == OS_MAC))
-				descriptors = ss_mtp_descs;
-/*-- 2015/07/08 USB Team, PCN00011 --*/
 			break;
 		case USB_SPEED_HIGH:
 			descriptors = f->hs_descriptors;
-/*++ 2015/07/08 USB Team, PCN00011 ++*/
-			if (!strcmp("mtp", f->name) && (os_type == OS_MAC))
-				descriptors = hs_mtp_descs;
-/*-- 2015/07/08 USB Team, PCN00011 --*/
 			break;
 		default:
 			descriptors = f->fs_descriptors;
-/*++ 2015/07/08 USB Team, PCN00011 ++*/
-			if (!strcmp("mtp", f->name) && (os_type == OS_MAC))
-				descriptors = fs_mtp_descs;
-/*-- 2015/07/08 USB Team, PCN00011 --*/
 		}
 
 		if (!descriptors)
@@ -1079,13 +1047,6 @@ void usb_remove_config(struct usb_composite_dev *cdev,
 
 	spin_unlock_irqrestore(&cdev->lock, flags);
 
-/*++ 2015/11/16 USB Team, PCN00038 ++*/
-	os_type = OS_NOT_YET;
-#ifdef CONFIG_HTC_USB_DEBUG_FLAG
-	printk("[USB]%s unbind+\n",__func__);
-#endif
-/*-- 2015/11/16 USB Team, PCN00038 --*/
-
 	unbind_config(cdev, config);
 }
 
@@ -1489,59 +1450,6 @@ static void composite_setup_complete(struct usb_ep *ep, struct usb_request *req)
 				req->status, req->actual, req->length);
 }
 
-/*++ 2015/11/16 USB Team, PCN00038 ++*/
-/*
- * Copyright (C) 2015 HTC, Inc.
- * Author: HTC USB Team
- * The following two functions are used for get OS_type for HTC device.
- * In tranditional design,the length of request USB_DT_CONFIG will
- * different. MAC is 4, Windows is 255, Linux is 9. But for MAC 10.11,
- * both MAC/LINUX is 9. Therefore, the design check_MAC_or_LINUX is use
- * for distinguish OS_type. This function will store the first length
- * of USB_DT_STRING and USB_DT_DEVICE and base on the value to get os
- * type.
- * 1. The length of first USB_DT_STRING is 2 and USB_DT_DEVICE is 18
- * for MAC.
- * 2. The length of first USB_DT_DEVICE is 8/64 for Windows/Linux.
- */
-static void check_MAC_or_LINUX(int first_dt_length, int first_string_length)
-{
-	switch (first_dt_length)
-	{
-		case MAC_FIRST_DT_LENGTH:
-			if (first_string_length == 2)
-				os_type = OS_MAC;
-			break;
-		case WIN_LINUX_FIRST_DT1_LENGTH:
-		case WIN_LINUX_FIRST_DT2_LENGTH:
-			os_type = OS_LINUX;
-			break;
-		default:
-			break;
-	}
-
-	if (os_type == OS_LINUX)
-		pr_info("%s: Re detect as OS_LINUX \n", __func__);
-	else if (os_type == OS_MAC)
-		pr_info("%s: Re detect as OS_MAC \n", __func__);
-	else
-		pr_info("unknown os type\n");
-}
-
-static void get_os_type(int length)
-{
-	if (length == 4) {
-		pr_info("%s: OS_MAC\n", __func__);
-		os_type = OS_MAC;
-	} else if (length == 255) {
-		pr_info("%s: OS_WINDOWS\n", __func__);
-		os_type = OS_WINDOWS;
-	} else if (length == 9 && os_type != OS_WINDOWS && os_type !=OS_MAC) {
-		check_MAC_or_LINUX(first_dt_w_length,first_string_w_length);
-	}
-}
-/*-- 2015/11/16 USB Team, PCN00038 --*/
-
 static int count_ext_compat(struct usb_configuration *c)
 {
 	int i, res;
@@ -1566,7 +1474,7 @@ static int count_ext_compat(struct usb_configuration *c)
 	return res;
 }
 
-static void fill_ext_compat(struct usb_configuration *c, u8 *buf)
+static int fill_ext_compat(struct usb_configuration *c, u8 *buf)
 {
 	int i, count;
 
@@ -1593,10 +1501,12 @@ static void fill_ext_compat(struct usb_configuration *c, u8 *buf)
 				buf += 23;
 			}
 			count += 24;
-			if (count >= 4096)
-				return;
+			if (count + 24 >= USB_COMP_EP0_OS_DESC_BUFSIZ)
+				return count;
 		}
 	}
+
+	return count;
 }
 
 static int count_ext_prop(struct usb_configuration *c, int interface)
@@ -1641,25 +1551,20 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
 	struct usb_os_desc *d;
 	struct usb_os_desc_ext_prop *ext_prop;
 	int j, count, n, ret;
-	u8 *start = buf;
 
 	f = c->interface[interface];
+	count = 10; /* header length */
 	for (j = 0; j < f->os_desc_n; ++j) {
 		if (interface != f->os_desc_table[j].if_id)
 			continue;
 		d = f->os_desc_table[j].os_desc;
 		if (d)
 			list_for_each_entry(ext_prop, &d->ext_prop, entry) {
-				/* 4kB minus header length */
-				n = buf - start;
-				if (n >= 4086)
-					return 0;
-
-				count = ext_prop->data_len +
+				n = ext_prop->data_len +
 					ext_prop->name_len + 14;
-				if (count > 4086 - n)
-					return -EINVAL;
-				usb_ext_prop_put_size(buf, count);
+				if (count + n >= USB_COMP_EP0_OS_DESC_BUFSIZ)
+					return count;
+				usb_ext_prop_put_size(buf, n);
 				usb_ext_prop_put_type(buf, ext_prop->type);
 				ret = usb_ext_prop_put_name(buf, ext_prop->name,
 							    ext_prop->name_len);
@@ -1685,11 +1590,12 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
 				default:
 					return -EINVAL;
 				}
-				buf += count;
+				buf += n;
+				count += n;
 			}
 	}
 
-	return 0;
+	return count;
 }
 
 /*
@@ -1735,12 +1641,6 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		switch (w_value >> 8) {
 
 		case USB_DT_DEVICE:
-/*++ 2015/11/16 USB Team, PCN00038 ++*/
-			if (first_dt_w_length == 0) {
-				first_dt_w_length = w_length;
-				printk("[USB] first_dt_w_length = %d \n",first_dt_w_length);
-			}
-/*-- 2015/11/16 USB Team, PCN00038 --*/
 			cdev->desc.bNumConfigurations =
 				count_configs(cdev, USB_DT_DEVICE);
 			if (cdev->desc.bNumConfigurations == 0) {
@@ -1787,7 +1687,6 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				break;
 			/* FALLTHROUGH */
 		case USB_DT_CONFIG:
-			get_os_type(w_length);/*++ 2015/11/16 USB Team, PCN00038 ++*/
 			spin_lock(&cdev->lock);
 			value = config_desc(cdev, w_value);
 			spin_unlock(&cdev->lock);
@@ -1795,12 +1694,6 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 				value = min(w_length, (u16) value);
 			break;
 		case USB_DT_STRING:
-/*++ 2015/11/16 USB Team, PCN00038 ++*/
-			if (first_string_w_length == 0) {
-				first_string_w_length = w_length;
-				printk("[USB] first_string_w_length = %d \n",first_string_w_length);
-			}
-/*-- 2015/11/16 USB Team, PCN00038 --*/
 			spin_lock(&cdev->lock);
 			value = get_string(cdev, req->buf,
 					w_index, w_value & 0xff);
@@ -1868,6 +1761,8 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			value = 0;
 			break;
 		}
+
+		spin_lock(&cdev->lock);
 		value = f->set_alt(f, w_index, w_value);
 		if (value == USB_GADGET_DELAYED_STATUS) {
 			DBG(cdev,
@@ -1877,6 +1772,7 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 			DBG(cdev, "delayed_status count %d\n",
 					cdev->delayed_status);
 		}
+		spin_unlock(&cdev->lock);
 		break;
 	case USB_REQ_GET_INTERFACE:
 		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE))
@@ -1971,6 +1867,7 @@ unknown:
 			req->complete = composite_setup_complete;
 			buf = req->buf;
 			os_desc_cfg = cdev->os_desc_config;
+			w_length = min_t(u16, w_length, USB_COMP_EP0_OS_DESC_BUFSIZ);
 			memset(buf, 0, w_length);
 			buf[5] = 0x01;
 			switch (ctrl->bRequestType & USB_RECIP_MASK) {
@@ -1994,8 +1891,8 @@ unknown:
 					count += 16; /* header */
 					put_unaligned_le32(count, buf);
 					buf += 16;
-					fill_ext_compat(os_desc_cfg, buf);
-					value = w_length;
+					value = fill_ext_compat(os_desc_cfg, buf);
+					value = min_t(u16, w_length, value);
 				}
 				break;
 			case USB_RECIP_INTERFACE:
@@ -2024,8 +1921,7 @@ unknown:
 							      interface, buf);
 					if (value < 0)
 						return value;
-
-					value = w_length;
+					value = min_t(u16, w_length, value);
 				}
 				break;
 			}
@@ -2152,12 +2048,8 @@ void composite_disconnect(struct usb_gadget *gadget)
 		}
 		reset_config(cdev);
 	}
-/*++ 2015/07/08 USB Team, PCN00011 ++*/
-	if (cdev->driver->disconnect) {
+	if (cdev->driver->disconnect)
 		cdev->driver->disconnect(cdev);
-		os_type = OS_NOT_YET;
-	}
-/*-- 2015/07/08 USB Team, PCN00011 --*/
 	if (cdev->delayed_status != 0) {
 		INFO(cdev, "delayed status mismatch..resetting\n");
 		cdev->delayed_status = 0;
@@ -2165,26 +2057,6 @@ void composite_disconnect(struct usb_gadget *gadget)
 	spin_unlock_irqrestore(&cdev->lock, flags);
 }
 
-/*++ 2015/11/26 USB Team, PCN00043 ++*/
-void composite_mute_disconnect(struct usb_gadget *gadget)
-{
-	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
-	unsigned long				flags;
-
-	/* REVISIT:  should we have config and device level
-	 * disconnect callbacks?
-	 */
-	spin_lock_irqsave(&cdev->lock, flags);
-	if (cdev->config)
-		reset_config(cdev);
-
-	if (cdev->delayed_status != 0) {
-		INFO(cdev, "delayed status mismatch..resetting\n");
-		cdev->delayed_status = 0;
-	}
-	spin_unlock_irqrestore(&cdev->lock, flags);
-}
-/*-- 2015/11/26 USB Team, PCN00043 --*/
 /*-------------------------------------------------------------------------*/
 
 static ssize_t suspended_show(struct device *dev, struct device_attribute *attr,
@@ -2200,6 +2072,8 @@ static DEVICE_ATTR_RO(suspended);
 static void __composite_unbind(struct usb_gadget *gadget, bool unbind_driver)
 {
 	struct usb_composite_dev	*cdev = get_gadget_data(gadget);
+	struct usb_gadget_strings	*gstr = cdev->driver->strings[0];
+	struct usb_string		*dev_str = gstr->strings;
 
 	/* composite_disconnect() must already have been called
 	 * by the underlying peripheral controller driver!
@@ -2219,6 +2093,9 @@ static void __composite_unbind(struct usb_gadget *gadget, bool unbind_driver)
 		cdev->driver->unbind(cdev);
 
 	composite_dev_cleanup(cdev);
+
+	if (dev_str[USB_GADGET_MANUFACTURER_IDX].s == cdev->def_manufacturer)
+		dev_str[USB_GADGET_MANUFACTURER_IDX].s = "";
 
 	kfree(cdev->def_manufacturer);
 	kfree(cdev);
@@ -2326,8 +2203,8 @@ int composite_os_desc_req_prepare(struct usb_composite_dev *cdev,
 		goto end;
 	}
 
-	/* OS feature descriptor length <= 4kB */
-	cdev->os_desc_req->buf = kmalloc(4096, GFP_KERNEL);
+	cdev->os_desc_req->buf = kmalloc(USB_COMP_EP0_OS_DESC_BUFSIZ,
+					 GFP_KERNEL);
 	if (!cdev->os_desc_req->buf) {
 		ret = PTR_ERR(cdev->os_desc_req->buf);
 		kfree(cdev->os_desc_req);
@@ -2489,8 +2366,6 @@ static const struct usb_gadget_driver composite_driver_template = {
 	.setup		= composite_setup,
 	.reset		= composite_disconnect,
 	.disconnect	= composite_disconnect,
-
-	.mute_disconnect = composite_mute_disconnect,   /*++ 2015/11/26 USB Team, PCN00043 ++*/
 
 	.suspend	= composite_suspend,
 	.resume		= composite_resume,

@@ -33,34 +33,12 @@
 #include <asm/system_misc.h>
 #include <asm/suspend.h>
 
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-#include <htc_mnemosyne/htc_footprint.h>
-#include <linux/msm_rtb.h>
-#endif
-
 #define PSCI_POWER_STATE_TYPE_STANDBY		0
 #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
 
 #define PSCI_POWER_STATE_BIT	BIT(30)
 
-struct psci_power_state {
-	u16	id;
-	u8	type;
-	u8	affinity_level;
-};
-
-struct psci_operations {
-	int (*cpu_suspend)(unsigned long state_id,
-			   unsigned long entry_point);
-	int (*cpu_off)(struct psci_power_state state);
-	int (*cpu_on)(unsigned long cpuid, unsigned long entry_point);
-	int (*migrate)(unsigned long cpuid);
-	int (*affinity_info)(unsigned long target_affinity,
-			unsigned long lowest_affinity_level);
-	int (*migrate_info_type)(void);
-};
-
-static struct psci_operations psci_ops;
+struct psci_operations psci_ops;
 
 static int (*invoke_psci_fn)(u64, u64, u64, u64);
 typedef int (*psci_initcall_t)(const struct device_node *);
@@ -134,18 +112,8 @@ static int psci_cpu_suspend(unsigned long  state_id,
 	int err;
 	u32 fn;
 
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-	int cpu;
-	cpu = smp_processor_id();
-	set_cpu_foot_print(cpu, 0x1);
-	uncached_logk(LOGK_CTXID, (void *)PSCI_FOOT_PRINT_SUSPEND_ENTRY);
-#endif
 	fn = psci_function_id[PSCI_FN_CPU_SUSPEND];
 	err = invoke_psci_fn(fn, state_id, entry_point, 0);
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-	uncached_logk(LOGK_CTXID, (void *)PSCI_FOOT_PRINT_SUSPEND_EXIT);
-	set_cpu_foot_print(cpu, 0xa);
-#endif
 	return psci_to_linux_errno(err);
 }
 
@@ -153,11 +121,9 @@ static int psci_cpu_off(struct psci_power_state state)
 {
 	int err;
 	u32 fn, power_state;
+
 	fn = psci_function_id[PSCI_FN_CPU_OFF];
 	power_state = psci_power_state_pack(state);
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-	uncached_logk(LOGK_CTXID, (void *)PSCI_FOOT_PRINT_OFF_ENTRY);
-#endif
 	err = invoke_psci_fn(fn, power_state, 0, 0);
 	return psci_to_linux_errno(err);
 }
@@ -324,6 +290,7 @@ static int __init psci_1_0_init(struct device_node *np)
 	}
 
 	pr_info("Using standard PSCI v0.2 function IDs\n");
+	psci_ops.get_version = psci_get_version;
 	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
 	psci_ops.cpu_suspend = psci_cpu_suspend;
 
@@ -377,6 +344,7 @@ static int __init psci_0_2_init(struct device_node *np)
 	}
 
 	pr_info("Using standard PSCI v0.2 function IDs\n");
+	psci_ops.get_version = psci_get_version;
 	psci_function_id[PSCI_FN_CPU_SUSPEND] = PSCI_0_2_FN64_CPU_SUSPEND;
 	psci_ops.cpu_suspend = psci_cpu_suspend;
 
@@ -419,6 +387,7 @@ static int __init psci_0_1_init(struct device_node *np)
 		goto out_put_node;
 
 	pr_info("Using PSCI v0.1 Function IDs from DT\n");
+	psci_ops.get_version = psci_get_version;
 
 	if (!of_property_read_u32(np, "cpu_suspend", &id)) {
 		psci_function_id[PSCI_FN_CPU_SUSPEND] = id;
@@ -488,16 +457,6 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
 	int err = psci_ops.cpu_on(cpu_logical_map(cpu), __pa(secondary_entry));
 	if (err)
 		pr_err("failed to boot CPU%d (%d)\n", cpu, err);
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-	uncached_logk(LOGK_CTXID, (void *)PSCI_FOOT_PRINT_OFF_EXIT);
-	init_cpu_foot_print(cpu, false, true);
-	if (err)
-		set_cpu_foot_print(cpu, 0xfa);
-	else {
-		set_cpu_foot_print(cpu, 0xb);
-		inc_kernel_exit_counter_from_pc(cpu);
-	}
-#endif
 
 	return err;
 }
@@ -521,16 +480,9 @@ static void cpu_psci_cpu_die(unsigned int cpu)
 	struct psci_power_state state = {
 		.type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
 	};
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-	init_cpu_foot_print(cpu, false, true);
-	set_cpu_foot_print(cpu, 0x1);
-#endif
 
 	ret = psci_ops.cpu_off(state);
-#ifdef CONFIG_HTC_DEBUG_FOOTPRINT
-	init_cpu_foot_print(cpu, false, true);
-	set_cpu_foot_print(cpu, 0xfe);
-#endif
+
 	pr_crit("unable to power off CPU%u (%d)\n", cpu, ret);
 }
 

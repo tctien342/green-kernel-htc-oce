@@ -256,9 +256,6 @@ struct usb_ep_ops {
 struct usb_ep {
 	void			*driver_data;
 
-/*++ 2015/12/25, USB Team, PCN00051 ++*/
-	bool			is_ncm;
-/*-- 2015/12/25, USB Team, PCN00051 --*/
 	const char		*name;
 	const struct usb_ep_ops	*ops;
 	struct list_head	ep_list;
@@ -682,9 +679,6 @@ struct usb_gadget {
 	bool				remote_wakeup;
 	u32				xfer_isr_count;
 	u8				usb_core_id;
-/*++ 2015/12/25, USB Team, PCN00051 ++*/
-	int				miMaxMtu;
-/*-- 2015/12/25, USB Team, PCN00051 --*/
 	bool				l1_supported;
 	bool				bam2bam_func_enabled;
 	u32				extra_buf_alloc;
@@ -707,8 +701,20 @@ static inline struct usb_gadget *dev_to_usb_gadget(struct device *dev)
 
 
 /**
+ * usb_ep_align - returns @len aligned to ep's maxpacketsize.
+ * @ep: the endpoint whose maxpacketsize is used to align @len
+ * @len: buffer size's length to align to @ep's maxpacketsize
+ *
+ * This helper is used to align buffer's size to an ep's maxpacketsize.
+ */
+static inline size_t usb_ep_align(struct usb_ep *ep, size_t len)
+{
+	return round_up(len, (size_t)le16_to_cpu(ep->desc->wMaxPacketSize));
+}
+
+/**
  * usb_ep_align_maybe - returns @len aligned to ep's maxpacketsize if gadget
- *	requires quirk_ep_out_aligned_size, otherwise reguens len.
+ *	requires quirk_ep_out_aligned_size, otherwise returns len.
  * @g: controller to check for quirk
  * @ep: the endpoint whose maxpacketsize is used to align @len
  * @len: buffer size's length to align to @ep's maxpacketsize
@@ -719,9 +725,7 @@ static inline struct usb_gadget *dev_to_usb_gadget(struct device *dev)
 static inline size_t
 usb_ep_align_maybe(struct usb_gadget *g, struct usb_ep *ep, size_t len)
 {
-	return !g->quirk_ep_out_aligned_size ? len :
-			max_t(size_t, 512,
-			round_up(len, (size_t)ep->desc->wMaxPacketSize));
+	return g->quirk_ep_out_aligned_size ? usb_ep_align(ep, len) : len;
 }
 
 /**
@@ -1157,7 +1161,6 @@ struct usb_gadget_driver {
 	int			(*setup)(struct usb_gadget *,
 					const struct usb_ctrlrequest *);
 	void			(*disconnect)(struct usb_gadget *);
-	void			(*mute_disconnect)(struct usb_gadget *);   /*++ 2015/11/26 USB Team, PCN00043 ++*/
 	void			(*suspend)(struct usb_gadget *);
 	void			(*resume)(struct usb_gadget *);
 	void			(*reset)(struct usb_gadget *);
@@ -1349,15 +1352,5 @@ extern void usb_ep_autoconfig_reset(struct usb_gadget *);
 extern struct usb_ep *usb_ep_autoconfig_by_name(struct usb_gadget *,
 			struct usb_endpoint_descriptor *,
 			const char *ep_name);
-
-/*++ 2015/10/12, USB Team, PCN00021 ++*/
-enum {
-	PROPERTY_CHG_STATUS = 0,
-	PROPERTY_RESTART_USB,
-	PROPERTY_VBUS_STATUS,
-	PROPERTY_CURRENT_MAX,
-};
-/*-- 2015/10/12, USB Team, PCN00021 --*/
-
 
 #endif /* __LINUX_USB_GADGET_H */

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -30,10 +30,6 @@
 #define LPASS_BE_AUXPCM_TX "AUX_PCM_TX"
 #define LPASS_BE_SEC_AUXPCM_RX "SEC_AUX_PCM_RX"
 #define LPASS_BE_SEC_AUXPCM_TX "SEC_AUX_PCM_TX"
-#define LPASS_BE_TERT_AUXPCM_RX "TERT_AUX_PCM_RX"
-#define LPASS_BE_TERT_AUXPCM_TX "TERT_AUX_PCM_TX"
-#define LPASS_BE_QUAT_AUXPCM_RX "QUAT_AUX_PCM_RX"
-#define LPASS_BE_QUAT_AUXPCM_TX "QUAT_AUX_PCM_TX"
 #define LPASS_BE_VOICE_PLAYBACK_TX "VOICE_PLAYBACK_TX"
 #define LPASS_BE_VOICE2_PLAYBACK_TX "VOICE2_PLAYBACK_TX"
 #define LPASS_BE_INCALL_RECORD_RX "INCALL_RECORD_RX"
@@ -43,7 +39,6 @@
 
 #define LPASS_BE_MI2S_RX "MI2S_RX"
 #define LPASS_BE_MI2S_TX "MI2S_TX"
-#define LPASS_BE_QUAT_MI2S "QUAT_MI2S" /* HTC_AUD */
 #define LPASS_BE_QUAT_MI2S_RX "QUAT_MI2S_RX"
 #define LPASS_BE_QUAT_MI2S_TX "QUAT_MI2S_TX"
 #define LPASS_BE_SEC_MI2S_RX "SEC_MI2S_RX"
@@ -165,6 +160,8 @@ enum {
 	MSM_FRONTEND_DAI_MULTIMEDIA19,
 	MSM_FRONTEND_DAI_MULTIMEDIA20,
 	MSM_FRONTEND_DAI_MULTIMEDIA21,
+	MSM_FRONTEND_DAI_MULTIMEDIA28,
+	MSM_FRONTEND_DAI_MULTIMEDIA29,
 	MSM_FRONTEND_DAI_CS_VOICE,
 	MSM_FRONTEND_DAI_VOIP,
 	MSM_FRONTEND_DAI_AFE_RX,
@@ -190,8 +187,8 @@ enum {
 	MSM_FRONTEND_DAI_MAX,
 };
 
-#define MSM_FRONTEND_DAI_MM_SIZE (MSM_FRONTEND_DAI_MULTIMEDIA21 + 1)
-#define MSM_FRONTEND_DAI_MM_MAX_ID MSM_FRONTEND_DAI_MULTIMEDIA21
+#define MSM_FRONTEND_DAI_MM_SIZE (MSM_FRONTEND_DAI_MULTIMEDIA29 + 1)
+#define MSM_FRONTEND_DAI_MM_MAX_ID MSM_FRONTEND_DAI_MULTIMEDIA29
 
 enum {
 	MSM_BACKEND_DAI_PRI_I2S_RX = 0,
@@ -235,10 +232,6 @@ enum {
 	MSM_BACKEND_DAI_AUDIO_I2S_RX,
 	MSM_BACKEND_DAI_SEC_AUXPCM_RX,
 	MSM_BACKEND_DAI_SEC_AUXPCM_TX,
-	MSM_BACKEND_DAI_TERT_AUXPCM_RX,
-	MSM_BACKEND_DAI_TERT_AUXPCM_TX,
-	MSM_BACKEND_DAI_QUAT_AUXPCM_RX,
-	MSM_BACKEND_DAI_QUAT_AUXPCM_TX,
 	MSM_BACKEND_DAI_SLIMBUS_6_RX,
 	MSM_BACKEND_DAI_SLIMBUS_6_TX,
 	MSM_BACKEND_DAI_SPDIF_RX,
@@ -389,35 +382,6 @@ struct msm_pcm_stream_app_type_cfg {
 	int sample_rate;
 };
 
-/* HTC_AUD_START */
-struct htc_adm_effect_s {
-	u16 used;
-	u16 port_id;
-	uint32_t copp_id;
-	uint32_t payload_size;
-	void *payload;
-};
-
-enum HTC_ADM_EFFECT_ID {
-	HTC_ADM_EFFECT_ADAPTIVEAUDIO_DATA1 = 0,
-	HTC_ADM_EFFECT_ADAPTIVEAUDIO_DATA2,
-	HTC_ADM_EFFECT_ONEDOTONE,
-	HTC_ADM_EFFECT_ONEDOTONE_MUTE,
-	HTC_ADM_EFFECT_ONEDOTONE_RAMPING,
-	HTC_ADM_EFFECT_ONEDOTONE_LIMITER,
-#ifdef CONFIG_USE_AS_HS
-	HTC_ADM_EFFECT_AS_DATA1,/* as_conf_left_im */
-	HTC_ADM_EFFECT_AS_DATA2,/* as_conf_left_re */
-	HTC_ADM_EFFECT_AS_DATA3,/* as_conf_right_im */
-	HTC_ADM_EFFECT_AS_DATA4,/* as_conf_right_re */
-	HTC_ADM_EFFECT_AS_DATA5,/* as_limiter_conf */
-	HTC_ADM_EFFECT_AS_DATA6,/* as_limiter_enable */
-	HTC_ADM_EFFECT_AS_DATA7,/* as_enable */
-#endif
-	HTC_ADM_EFFECT_MAX,
-};
-/* HTC_AUD_END */
-
 /* dai_id: front-end ID,
  * dspst_id:  DSP audio stream ID
  * stream_type: playback or capture
@@ -450,4 +414,8 @@ void msm_pcm_routing_reg_stream_app_type_cfg(int fedai_id, int app_type,
 			int acdb_dev_id, int sample_rate, int session_type);
 int msm_pcm_routing_get_stream_app_type_cfg(int fedai_id, int session_type,
 			int *app_type, int *acdb_dev_id, int *sample_rate);
+int msm_pcm_routing_send_chmix_cfg(int fe_id, int ip_channel_cnt,
+				int op_channel_cnt, int *ch_wght_coeff,
+				int session_type, bool use_default_chmap,
+				char *channel_map);
 #endif /*_MSM_PCM_H*/

@@ -4,7 +4,7 @@
  * Copyright (C) 2003 Al Borchers (alborchers@steinerpoint.com)
  * Copyright (C) 2008 David Brownell
  * Copyright (C) 2008 by Nokia Corporation
- * Copyright (c) 2013-2015, 2017 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2015, 2017-2018 The Linux Foundation. All rights reserved.
  *
  * This code also borrows from usbserial.c, which is
  * Copyright (C) 1999 - 2002 Greg Kroah-Hartman (greg@kroah.com)
@@ -517,11 +517,10 @@ __acquires(&port->port_lock)
 		/*
 		 * If port_usb is NULL, gserial disconnect is called
 		 * while the spinlock is dropped and all requests are
-		 * freed. Free the current request here.
+		 * freed.
 		 */
 		if (!port->port_usb) {
 			started = 0;
-			gs_free_req(out, req);
 			break;
 		}
 		if (status) {
@@ -1239,9 +1238,12 @@ gs_port_alloc(unsigned port_num, struct usb_cdc_line_coding *coding)
 	}
 
 	tty_port_init(&port->port);
-	tty_buffer_set_limit(&port->port, 131072);
+	tty_buffer_set_limit(&port->port, 8388608);
 	spin_lock_init(&port->port_lock);
 	init_waitqueue_head(&port->drain_wait);
+
+	pr_debug("%s open:ttyGS%d and set 8388608, avail:%d\n", __func__,
+		port_num, tty_buffer_space_avail(&port->port));
 
 	INIT_WORK(&port->push, gs_rx_push);
 
@@ -1670,7 +1672,7 @@ static int userial_init(void)
 		return -ENOMEM;
 
 	gs_tty_driver->driver_name = "g_serial";
-	gs_tty_driver->name = "ttyHSUSB"; /*++ 2015/06/23 USB Team, PCN00004 ++*/
+	gs_tty_driver->name = "ttyGS";
 	/* uses dynamically assigned dev_t values */
 
 	gs_tty_driver->type = TTY_DRIVER_TYPE_SERIAL;
@@ -1687,12 +1689,6 @@ static int userial_init(void)
 			B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	gs_tty_driver->init_termios.c_ispeed = 9600;
 	gs_tty_driver->init_termios.c_ospeed = 9600;
-
-/*++ 2015/06/23 USB Team, PCN00004 ++*/
-	gs_tty_driver->init_termios.c_lflag = 0;
-	gs_tty_driver->init_termios.c_iflag = 0;
-	gs_tty_driver->init_termios.c_oflag = 0;
-/*-- 2015/06/23 USB Team, PCN00004 --*/
 
 	tty_set_operations(gs_tty_driver, &gs_tty_ops);
 	for (i = 0; i < MAX_U_SERIAL_PORTS; i++)

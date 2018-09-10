@@ -378,9 +378,6 @@ struct msm_vfe_axi_stream_cfg_cmd {
 	uint32_t stream_handle[VFE_AXI_SRC_MAX];
 	enum msm_vfe_axi_stream_cmd cmd;
 	uint8_t sync_frame_id_src;
-//HTC_START
-	uint32_t reduce_timeout;
-//HTC_END
 	enum msm_vfe_hw_state hw_state;
 };
 
@@ -920,6 +917,10 @@ struct msm_isp_ahb_clk_cfg {
 #define V4L2_PIX_FMT_P16GBRG10 v4l2_fourcc('P', 'G', 'B', '0')
 #define V4L2_PIX_FMT_P16GRBG10 v4l2_fourcc('P', 'G', 'R', '0')
 #define V4L2_PIX_FMT_P16RGGB10 v4l2_fourcc('P', 'R', 'G', '0')
+#define V4L2_PIX_FMT_P16BGGR12 v4l2_fourcc('P', 'B', 'G', '2')
+#define V4L2_PIX_FMT_P16GBRG12 v4l2_fourcc('P', 'G', 'B', '2')
+#define V4L2_PIX_FMT_P16GRBG12 v4l2_fourcc('P', 'G', 'R', '2')
+#define V4L2_PIX_FMT_P16RGGB12 v4l2_fourcc('P', 'R', 'G', '2')
 #define V4L2_PIX_FMT_NV14 v4l2_fourcc('N', 'V', '1', '4')
 #define V4L2_PIX_FMT_NV41 v4l2_fourcc('N', 'V', '4', '1')
 #define V4L2_PIX_FMT_META v4l2_fourcc('Q', 'M', 'E', 'T')

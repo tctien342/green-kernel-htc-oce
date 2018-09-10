@@ -2152,6 +2152,14 @@ static void regulator_disable_work(struct work_struct *work)
 	count = rdev->deferred_disables;
 	rdev->deferred_disables = 0;
 
+	/*
+	 * Workqueue functions queue the new work instance while the previous
+	 * work instance is being processed. Cancel the queued work instance
+	 * as the work instance under processing does the job of the queued
+	 * work instance.
+	 */
+	cancel_delayed_work(&rdev->disable_work);
+
 	for (i = 0; i < count; i++) {
 		ret = _regulator_disable(rdev);
 		if (ret != 0)
@@ -2186,7 +2194,6 @@ static void regulator_disable_work(struct work_struct *work)
 int regulator_disable_deferred(struct regulator *regulator, int ms)
 {
 	struct regulator_dev *rdev = regulator->rdev;
-	int ret;
 
 	if (regulator->always_on)
 		return 0;
@@ -2196,15 +2203,11 @@ int regulator_disable_deferred(struct regulator *regulator, int ms)
 
 	mutex_lock(&rdev->mutex);
 	rdev->deferred_disables++;
+	mod_delayed_work(system_power_efficient_wq, &rdev->disable_work,
+			 msecs_to_jiffies(ms));
 	mutex_unlock(&rdev->mutex);
 
-	ret = queue_delayed_work(system_power_efficient_wq,
-				 &rdev->disable_work,
-				 msecs_to_jiffies(ms));
-	if (ret < 0)
-		return ret;
-	else
-		return 0;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(regulator_disable_deferred);
 
@@ -3821,7 +3824,7 @@ static ssize_t reg_debug_volt_get(struct file *file, char __user *buf,
 	mutex_lock(&debug_buf_mutex);
 
 	output = snprintf(debug_buf, MAX_DEBUG_BUF_LEN-1, "%d\n", voltage);
-	rc = simple_read_from_buffer((void __user *) buf, output, ppos,
+	rc = simple_read_from_buffer((void __user *) buf, count, ppos,
 					(void *) debug_buf, output);
 
 	mutex_unlock(&debug_buf_mutex);
@@ -4548,12 +4551,14 @@ static int __init regulator_late_cleanup(struct device *dev, void *data)
 	if (rdev->use_count)
 		goto unlock;
 
-	enabled = _regulator_is_enabled(rdev);
+	/* If we can't read the status assume it's on. */
+	if (ops->is_enabled)
+		enabled = ops->is_enabled(rdev);
+	else
+		enabled = 1;
 
 	if (!enabled)
 		goto unlock;
-	else if (ops->is_enabled && !ops->is_enabled(rdev))
-		rdev_info(rdev, "actually enabled, but unused regulator\n");
 
 	if (have_full_constraints()) {
 		/* We log since this may kill the system if it goes

@@ -174,20 +174,6 @@ config INPUT_APMPOWER
 	  To compile this driver as a module, choose M here: the
 	  module will be called apm-power.
 
-config POWER_KEY_CLR_RESET
-	tristate "Power key clear reset"
-	depends on INPUT_KEYCOMBO
-	help
-	  Say Y here if you do not want to reset when power key is pressed.
-
-config INPUT_KEYLED
-	tristate "Virtual key led blink"
-	depends on INPUT
-	select INPUT_KEYCOMBO
-	help
-	  Say Y here if you want to blink virtual key led after 3 seconds
-	  reset combination keys are pressed.
-
 config INPUT_KEYRESET
 	bool "Reset key"
 	depends on INPUT
@@ -200,6 +186,13 @@ config INPUT_KEYCOMBO
 	depends on INPUT
 	---help---
 	  Say Y here if you want to take action when some keys are pressed;
+
+config SENSORS_HALL
+	bool "Hall sensor"
+	depends on INPUT
+	---help---
+	 Say y here if you want to use this hall sensor driver, it
+	 is like a switch. For example, lid.
 
 comment "Input Device Drivers"
 

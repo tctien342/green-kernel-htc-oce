@@ -27,8 +27,6 @@
 #include <linux/mmc/sdhci.h>
 #include <linux/workqueue.h>
 
-#include <trace/events/mmcio.h>
-
 #include "cmdq_hci.h"
 #include "sdhci.h"
 #include "sdhci-msm.h"
@@ -333,7 +331,7 @@ static int cmdq_host_alloc_tdl(struct cmdq_host *cq_host)
 	if (!cq_host->desc_base || !cq_host->trans_desc_base)
 		return -ENOMEM;
 
-	pr_info("desc-base: 0x%p trans-base: 0x%p\n desc_dma 0x%llx trans_dma: 0x%llx\n",
+	pr_debug("desc-base: 0x%pK trans-base: 0x%pK\n desc_dma 0x%llx trans_dma: 0x%llx\n",
 		 cq_host->desc_base, cq_host->trans_desc_base,
 		(unsigned long long)cq_host->desc_dma_base,
 		(unsigned long long) cq_host->trans_desc_dma_base);
@@ -756,34 +754,6 @@ static int cmdq_request(struct mmc_host *mmc, struct mmc_request *mrq)
 	}
 
 	cq_host->mrq_slot[tag] = mrq;
-
-	if (mmc->perf_enable && mrq->data) {
-		if (mmc->card)
-			// Not real CMD46/47, and real commands are issued by CPU
-			trace_mmc_req_start(&mmc->class_dev,
-				(mrq->data->flags == MMC_DATA_READ) ? 46 : 47,
-				mrq->cmdq_req->blk_addr, mrq->data->blocks, tag);
-
-		if (mrq->data->flags == MMC_DATA_READ) {
-			if (mmc->perf.cmdq_read_map == 0)
-				mmc->perf.cmdq_read_start = ktime_get();
-			mmc->perf.cmdq_read_map |= 1 << tag;
-		} else {
-			if (mmc->perf.cmdq_write_map == 0)
-				mmc->perf.cmdq_write_start = ktime_get();
-			mmc->perf.cmdq_write_map |= 1 << tag;
-		}
-
-		if (mmc->perf.cmdq_read_map & mmc->perf.cmdq_write_map) {
-			pr_warn_ratelimited("%s: %s: statistic R/W map error, R: 0x%04lx, W:0x%04lx\n",
-				mmc_hostname(mmc), __func__,
-				mmc->perf.cmdq_read_map, mmc->perf.cmdq_write_map);
-			if (mrq->data->flags == MMC_DATA_READ)
-				mmc->perf.cmdq_write_map &= ~(1 << tag);
-			else
-				mmc->perf.cmdq_read_map &= ~(1 << tag);
-		}
-	}
 
 	/* PM QoS */
 	sdhci_msm_pm_qos_irq_vote(host);

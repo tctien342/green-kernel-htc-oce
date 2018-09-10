@@ -316,6 +316,16 @@ static int notrace persistent_ram_update_user(struct persistent_ram_zone *prz,
 	return ret;
 }
 
+static int notrace persistent_ram_update_user(struct persistent_ram_zone *prz,
+	const void __user *s, unsigned int start, unsigned int count)
+{
+	struct persistent_ram_buffer *buffer = prz->buffer;
+	int ret = unlikely(__copy_from_user(buffer->data + start, s, count)) ?
+		-EFAULT : 0;
+	persistent_ram_update_ecc(prz, start, count);
+	return ret;
+}
+
 void persistent_ram_save_old(struct persistent_ram_zone *prz)
 {
 	struct persistent_ram_buffer *buffer = prz->buffer;

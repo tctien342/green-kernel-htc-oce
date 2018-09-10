@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -56,7 +56,7 @@ struct mdss_hw mdss_dsi1_hw = {
 };
 
 
-#define DSI_EVENT_Q_MAX	16
+#define DSI_EVENT_Q_MAX	4
 
 #define DSI_BTA_EVENT_TIMEOUT (HZ / 10)
 
@@ -2104,7 +2104,7 @@ static int mdss_dsi_cmd_dma_tx(struct mdss_dsi_ctrl_pdata *ctrl,
 			/* clear CMD DMA and BTA_DONE isr only */
 			reg_val |= (DSI_INTR_CMD_DMA_DONE | DSI_INTR_BTA_DONE);
 			MIPI_OUTP(ctrl->ctrl_base + 0x0110, reg_val);
-			mdss_dsi_disable_irq_nosync(ctrl, DSI_CMD_TERM);
+			mdss_dsi_disable_irq(ctrl, DSI_CMD_TERM);
 			complete(&ctrl->dma_comp);
 
 			pr_warn("%s: dma tx done but irq not triggered\n",
@@ -2417,7 +2417,6 @@ static int mdss_dsi_mdp_busy_tout_check(struct mdss_dsi_ctrl_pdata *ctrl)
 	bool stop_hs_clk = false;
 	int tout = 1;
 
-	MDSS_XLOG(ctrl->ndx, ctrl->mdp_busy, current->pid, 0xbadf);
 	/*
 	 * two possible scenario:
 	 * 1) DSI_INTR_CMD_MDP_DONE set but isr not fired
@@ -2482,13 +2481,8 @@ void mdss_dsi_cmd_mdp_busy(struct mdss_dsi_ctrl_pdata *ctrl)
 		if (!ctrl->mdp_busy)
 			rc = 1;
 		spin_unlock_irqrestore(&ctrl->mdp_lock, flags);
-		if (!rc && mdss_dsi_mdp_busy_tout_check(ctrl)) {
-			u32 status;
-			struct mdss_data_type *mdata = mdss_mdp_get_mdata();
-
-			status = readl_relaxed(mdata->mdp_base + MDSS_REG_HW_INTR2_STATUS);
-			pr_err("%s: timeout error, TE ISR status=0x%x\n", __func__, status);
-		}
+		if (!rc && mdss_dsi_mdp_busy_tout_check(ctrl))
+			pr_err("%s: timeout error\n", __func__);
 	}
 	pr_debug("%s: done pid=%d\n", __func__, current->pid);
 	MDSS_XLOG(ctrl->ndx, ctrl->mdp_busy, current->pid, XLOG_FUNC_EXIT);
@@ -2791,9 +2785,6 @@ static void dsi_send_events(struct mdss_dsi_ctrl_pdata *ctrl,
 	pr_debug("%s: ev=%x\n", __func__, events);
 
 	spin_lock(&dsi_event.event_lock);
-	if (((dsi_event.event_pndx + 1) % DSI_EVENT_Q_MAX) == dsi_event.event_gndx) {
-		pr_err("%s: dsi event full\n", __func__);
-	}
 	evq = &dsi_event.todo_list[dsi_event.event_pndx++];
 	evq->todo = events;
 	evq->arg = arg;
@@ -2846,8 +2837,6 @@ static int dsi_event_thread(void *data)
 				pr_debug("%s: Handling underflow event\n",
 							__func__);
 				__dsi_fifo_error_handler(ctrl, true);
-			} else {
-				pr_info("%s: No recovery fn for underflow event\n", __func__);
 			}
 			mutex_unlock(&ctrl->mutex);
 		}
@@ -3158,7 +3147,6 @@ irqreturn_t mdss_dsi_isr(int irq, void *ptr)
 {
 	u32 isr;
 	u32 intr;
-	u32 isr2 = 0, mask2 = DSI_INTR_VIDEO_DONE | DSI_INTR_CMD_DMA_DONE | DSI_INTR_CMD_MDP_DONE;
 	struct mdss_dsi_ctrl_pdata *ctrl =
 			(struct mdss_dsi_ctrl_pdata *)ptr;
 
@@ -3170,15 +3158,8 @@ irqreturn_t mdss_dsi_isr(int irq, void *ptr)
 
 	isr = MIPI_INP(ctrl->ctrl_base + 0x0110);/* DSI_INTR_CTRL */
 	MIPI_OUTP(ctrl->ctrl_base + 0x0110, (isr & ~DSI_INTR_ERROR));
-	isr2 = MIPI_INP(ctrl->ctrl_base + 0x0110);/* DSI_INTR_CTRL */
-	if (isr2 & mask2) {
-		pr_warn("%s: unclear intr ctrl, ndx=%d, isr=%x, isr2=%x, irq=%x\n",
-			__func__, ctrl->ndx, isr, isr2, irq);
-		mdelay(3);
-		MIPI_OUTP(ctrl->ctrl_base + 0x0110, (isr2 & ~DSI_INTR_ERROR));
-	}
 
-	pr_debug("%s: ndx=%d isr=%x, isr2=%x\n", __func__, ctrl->ndx, isr, isr2);
+	pr_debug("%s: ndx=%d isr=%x\n", __func__, ctrl->ndx, isr);
 
 	if (isr & DSI_INTR_ERROR) {
 		MDSS_XLOG(ctrl->ndx, ctrl->mdp_busy, isr, 0x97);
@@ -3217,7 +3198,7 @@ irqreturn_t mdss_dsi_isr(int irq, void *ptr)
 	}
 
 	if (isr & DSI_INTR_CMD_DMA_DONE) {
-		MDSS_XLOG(ctrl->ndx, ctrl->mdp_busy, isr, isr2, 0x98);
+		MDSS_XLOG(ctrl->ndx, ctrl->mdp_busy, isr, 0x98);
 		spin_lock(&ctrl->mdp_lock);
 		mdss_dsi_disable_irq_nosync(ctrl, DSI_CMD_TERM);
 		complete(&ctrl->dma_comp);
@@ -3225,7 +3206,7 @@ irqreturn_t mdss_dsi_isr(int irq, void *ptr)
 	}
 
 	if (isr & DSI_INTR_CMD_MDP_DONE) {
-		MDSS_XLOG(ctrl->ndx, ctrl->mdp_busy, isr, isr2, 0x99);
+		MDSS_XLOG(ctrl->ndx, ctrl->mdp_busy, isr, 0x99);
 		spin_lock(&ctrl->mdp_lock);
 		mdss_dsi_disable_irq_nosync(ctrl, DSI_MDP_TERM);
 		if (ctrl->shared_data->cmd_clk_ln_recovery_en &&

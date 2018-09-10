@@ -44,7 +44,7 @@
 
 #define ENABLE_CPP_LOW		0
 
-#define CPP_CMD_TIMEOUT_MS	50
+#define CPP_CMD_TIMEOUT_MS	300
 #define MSM_CPP_INVALID_OFFSET	0x00000000
 #define MSM_CPP_NOMINAL_CLOCK	266670000
 #define MSM_CPP_TURBO_CLOCK	320000000
@@ -1002,10 +1002,7 @@ static int cpp_init_hardware(struct cpp_device *cpp_dev)
 		if (vbif_version == VBIF_VERSION_2_3_0)
 			cpp_dev->hw_info.cpp_hw_version = CPP_HW_VERSION_4_0_0;
 	}
-	//HTC_START
-	//remove log
-	//pr_info("CPP HW Version: 0x%x\n", cpp_dev->hw_info.cpp_hw_version);
-	//HTC_END
+	pr_info("CPP HW Version: 0x%x\n", cpp_dev->hw_info.cpp_hw_version);
 	cpp_dev->hw_info.cpp_hw_caps =
 		msm_camera_io_r(cpp_dev->cpp_hw_base + 0x4);
 
@@ -1023,10 +1020,7 @@ static int cpp_init_hardware(struct cpp_device *cpp_dev)
 			__func__, rc);
 		goto pwr_collapse_reset;
 	}
-	//HTC_START
-	//remove log
-	//pr_err("stream_cnt:%d\n", cpp_dev->stream_cnt);
-	//HTC_END
+	pr_err("stream_cnt:%d\n", cpp_dev->stream_cnt);
 	cpp_dev->stream_cnt = 0;
 	if (cpp_dev->fw_name_bin) {
 		msm_camera_enable_irq(cpp_dev->irq, false);
@@ -1212,10 +1206,6 @@ static int32_t cpp_load_fw(struct cpp_device *cpp_dev, char *fw_name_bin)
 		pr_err("%s:%d] poll command %x failed %d", __func__, __LINE__,
 			MSM_CPP_MSG_ID_JUMP_ACK, rc);
 	}
-
-	rc = msm_cpp_update_gdscr_status(cpp_dev, true);
-	if (rc < 0)
-		pr_err("update cpp gdscr status failed\n");
 
 end:
 	return rc;

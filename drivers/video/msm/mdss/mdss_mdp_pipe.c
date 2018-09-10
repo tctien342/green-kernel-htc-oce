@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, 2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1509,8 +1509,7 @@ static bool mdss_mdp_check_pipe_in_use(struct mdss_mdp_pipe *pipe)
 			pr_err("IN USE: pipe=%d mixer=%d\n",
 					pipe->num, mixer->num);
 			MDSS_XLOG_TOUT_HANDLER("mdp", "vbif", "vbif_nrt",
-				"dbg_bus", "vbif_dbg_bus");
-			in_use = true;
+				"dbg_bus", "vbif_dbg_bus", "panic");
 		}
 
 		mixer = ctl->mixer_right;
@@ -1519,8 +1518,7 @@ static bool mdss_mdp_check_pipe_in_use(struct mdss_mdp_pipe *pipe)
 			pr_err("IN USE: pipe=%d mixer=%d\n",
 					pipe->num, mixer->num);
 			MDSS_XLOG_TOUT_HANDLER("mdp", "vbif", "vbif_nrt",
-				"dbg_bus", "vbif_dbg_bus");
-			in_use = true;
+				"dbg_bus", "vbif_dbg_bus", "panic");
 		}
 	}
 
@@ -2306,7 +2304,7 @@ static int mdss_mdp_pipe_solidfill_setup(struct mdss_mdp_pipe *pipe)
 
 	/* support ARGB color format only */
 	unpack = (C3_ALPHA << 24) | (C2_R_Cr << 16) |
-		(C1_B_Cb << 8) | (C0_G_Y << 0);
+		(C0_G_Y << 8) | (C1_B_Cb << 0);
 	if (pipe->scaler.enable)
 		opmode |= (1 << 31);
 

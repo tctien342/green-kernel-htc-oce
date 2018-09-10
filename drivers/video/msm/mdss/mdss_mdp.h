@@ -56,8 +56,8 @@
 #define C1_B_Cb		1	/* B/Cb */
 #define C0_G_Y		0	/* G/luma */
 
-/* wait for 1 second for unexpected irq missing */
-#define KOFF_TIMEOUT_MS 1000
+/* wait for at most 2 vsync for lowest refresh rate (24hz) */
+#define KOFF_TIMEOUT_MS 84
 #define KOFF_TIMEOUT msecs_to_jiffies(KOFF_TIMEOUT_MS)
 
 #define OVERFETCH_DISABLE_TOP		BIT(0)
@@ -643,9 +643,7 @@ struct mdss_mdp_ctl {
 
 	/* vsync handler for FRC */
 	struct mdss_mdp_vsync_handler frc_vsync_handler;
-
-	/* HTC: */
-	struct mutex event_lock;
+	bool commit_in_progress;
 };
 
 struct mdss_mdp_mixer {
@@ -1025,9 +1023,6 @@ struct mdss_overlay_private {
 	struct kthread_worker worker;
 	struct kthread_work vsync_work;
 	struct task_struct *thread;
-
-	void *splash_mem_vaddr;
-	dma_addr_t splash_mem_dma;
 };
 
 struct mdss_mdp_set_ot_params {

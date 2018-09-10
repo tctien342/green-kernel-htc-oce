@@ -42,10 +42,6 @@
 
 #include <trace/events/exception.h>
 
-#if defined(CONFIG_HTC_DEBUG_RTB)
-#include <linux/msm_rtb.h>
-#endif
-
 static const char *fault_name(unsigned int esr);
 
 /*
@@ -99,9 +95,6 @@ static bool is_el1_instruction_abort(unsigned int esr)
 static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
 			      unsigned int esr, struct pt_regs *regs)
 {
-#if defined(CONFIG_HTC_DEBUG_RTB)
-	static int enable_logk_die = 1;
-#endif
 	/*
 	 * Are we prepared to handle this kernel fault?
 	 * We are almost certainly not prepared to handle instruction faults.
@@ -109,16 +102,6 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
 	if (!is_el1_instruction_abort(esr) && fixup_exception(regs))
 		return;
 
-#if defined(CONFIG_HTC_DEBUG_RTB)
-	if (enable_logk_die) {
-		uncached_logk(LOGK_DIE, (void *)regs->pc);
-		uncached_logk(LOGK_DIE, (void *)regs->regs[30]);
-		uncached_logk(LOGK_DIE, (void *)addr);
-		/* Disable RTB here to avoid weird recursive spinlock/printk behaviors */
-		msm_rtb_disable();
-		enable_logk_die = 0;
-	}
-#endif
 	/*
 	 * No handler, we'll have to terminate things with extreme prejudice.
 	 */
@@ -310,8 +293,11 @@ retry:
 	 * signal first. We do not need to release the mmap_sem because it
 	 * would already be released in __lock_page_or_retry in mm/filemap.c.
 	 */
-	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
+	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
+		if (!user_mode(regs))
+			goto no_context;
 		return 0;
+	}
 
 	/*
 	 * Major/minor page fault accounting is only done on the initial
@@ -420,13 +406,6 @@ static int __kprobes do_translation_fault(unsigned long addr,
 	return 0;
 }
 
-static int do_alignment_fault(unsigned long addr, unsigned int esr,
-			      struct pt_regs *regs)
-{
-	do_bad_area(addr, esr, regs);
-	return 0;
-}
-
 /*
  * This abort handler always returns "fault".
  */
@@ -475,7 +454,7 @@ static const struct fault_info {
 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
 	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk" },
 	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
-	{ do_alignment_fault,   SIGBUS,  BUS_ADRALN,    "alignment fault"               },
+	{ do_bad,		SIGBUS,  BUS_ADRALN,	"alignment fault"		},
 	{ do_bad,		SIGBUS,  0,		"debug event"			},
 	{ do_bad,		SIGBUS,  0,		"unknown 35"			},
 	{ do_bad,		SIGBUS,  0,		"unknown 36"			},
@@ -534,6 +513,22 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 	info.si_code  = inf->code;
 	info.si_addr  = (void __user *)addr;
 	arm64_notify_die("", regs, &info, esr);
+}
+
+asmlinkage void __exception do_el0_ia_bp_hardening(unsigned long addr,
+						   unsigned int esr,
+						   struct pt_regs *regs)
+{
+	/*
+	 * We've taken an instruction abort from userspace and not yet
+	 * re-enabled IRQs. If the address is a kernel address, apply
+	 * BP hardening prior to enabling IRQs and pre-emption.
+	 */
+	if (addr > TASK_SIZE)
+		arm64_apply_bp_hardening();
+
+	local_irq_enable();
+	do_mem_abort(addr, esr, regs);
 }
 
 /*

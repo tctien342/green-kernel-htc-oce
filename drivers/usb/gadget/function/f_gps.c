@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -19,6 +19,7 @@
 #include "usb_gadget_xport.h"
 #include "u_rmnet.h"
 #include "gadget_chips.h"
+#include "u_glink.c"
 
 #define GPS_NOTIFY_INTERVAL	5
 #define GPS_MAX_NOTIFY_SIZE	64
@@ -222,20 +223,39 @@ static int gps_gport_setup(void)
 	u8 base;
 	int res;
 
-	res = gsmd_ctrl_setup(GPS_CTRL_CLIENT, 1, &base);
-	gps_port.port->port_num = base;
+	switch (gps_port.ctrl_xport) {
+	case USB_GADGET_XPORT_GLINK:
+		res = glink_ctrl_setup(GPS_CTRL_CLIENT, 1, &base);
+		gps_port.port->port_num = base;
+		break;
+	default:
+		res = gsmd_ctrl_setup(GPS_CTRL_CLIENT, 1, &base);
+		gps_port.port->port_num = base;
+		break;
+	}
 	return res;
 }
 
 static int gport_ctrl_connect(struct f_gps *dev)
 {
-	return gsmd_ctrl_connect(&dev->port, dev->port_num);
+	switch (gps_port.ctrl_xport) {
+	case USB_GADGET_XPORT_GLINK:
+		return glink_ctrl_connect(&dev->port, dev->port_num);
+	default:
+		return gsmd_ctrl_connect(&dev->port, dev->port_num);
+	}
 }
 
 static int gport_gps_disconnect(struct f_gps *dev)
 {
-	gsmd_ctrl_disconnect(&dev->port, dev->port_num);
-	return 0;
+	switch (gps_port.ctrl_xport) {
+	case USB_GADGET_XPORT_GLINK:
+		glink_ctrl_disconnect(&dev->port, dev->port_num);
+		return 0;
+	default:
+		gsmd_ctrl_disconnect(&dev->port, dev->port_num);
+		return 0;
+	}
 }
 
 static void gps_unbind(struct usb_configuration *c, struct usb_function *f)
@@ -331,6 +351,15 @@ static void gps_resume(struct usb_function *f)
 		return;
 
 	dev->is_suspended = false;
+
+	/* Check if the previous session is closed as part of suspend
+	 * and try to reconnect to open a new session.
+	 */
+	if (!atomic_read(&dev->ctrl_online)) {
+		pr_debug("%s: ctrl disconnected, reconnect again\n", __func__);
+		gport_ctrl_connect(dev);
+	}
+
 	spin_lock(&dev->lock);
 	if (list_empty(&dev->cpkt_resp_q)) {
 		spin_unlock(&dev->lock);
@@ -413,6 +442,7 @@ static void gps_disable(struct usb_function *f)
 
 	usb_ep_disable(dev->notify);
 	dev->notify->driver_data = NULL;
+	dev->is_suspended = false;
 
 	atomic_set(&dev->online, 0);
 
@@ -569,7 +599,8 @@ gps_send_cpkt_response(void *gr, void *buf, size_t len)
 	}
 	cpkt = gps_alloc_ctrl_pkt(len, GFP_ATOMIC);
 	if (IS_ERR(cpkt)) {
-		pr_err("%s: Unable to allocate ctrl pkt\n", __func__);
+		pr_err_ratelimited("%s: Unable to allocate ctrl pkt\n",
+					__func__);
 		return -ENOMEM;
 	}
 	memcpy(cpkt->buf, buf, len);
@@ -577,7 +608,7 @@ gps_send_cpkt_response(void *gr, void *buf, size_t len)
 
 	dev = port_to_gps(gr);
 
-	pr_debug("%s: dev:%pK\n", __func__, dev);
+	pr_debug_ratelimited("%s: dev:%pK\n", __func__, dev);
 
 	if (!atomic_read(&dev->online) || !atomic_read(&dev->ctrl_online)) {
 		gps_free_ctrl_pkt(cpkt);
@@ -910,7 +941,7 @@ static void gps_cleanup(void)
 	kfree(gps_port.port);
 }
 
-static int gps_init_port(void)
+static int gps_init_port(const char *transport_name)
 {
 	struct f_gps			*dev;
 
@@ -925,7 +956,8 @@ static int gps_init_port(void)
 	dev->port_num = 0;
 
 	gps_port.port = dev;
-	gps_port.ctrl_xport = USB_GADGET_XPORT_SMD;
+	gps_port.ctrl_xport = str_to_xport(transport_name);
+	pr_debug("%s: init GPS with transport: %s\n", __func__, transport_name);
 
 	return 0;
 }

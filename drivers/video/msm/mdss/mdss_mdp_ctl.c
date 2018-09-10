@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -933,6 +933,7 @@ static u32 mdss_mdp_calc_prefill_line_time(struct mdss_mdp_ctl *ctl,
 {
 	u32 prefill_us = 0;
 	u32 prefill_amortized = 0;
+	struct mdss_data_type *mdata;
 	struct mdss_mdp_mixer *mixer;
 	struct mdss_panel_info *pinfo;
 	u32 fps, v_total;
@@ -953,7 +954,7 @@ static u32 mdss_mdp_calc_prefill_line_time(struct mdss_mdp_ctl *ctl,
 	prefill_us = __get_min_prefill_line_time_us(ctl);
 
 	/* if pipe is amortizable, add the amortized prefill contribution */
-	if (mdss_mdp_is_amortizable_pipe(pipe, mixer, ctl->mdata)) {
+	if (mdss_mdp_is_amortizable_pipe(pipe, mixer, mdata)) {
 		prefill_amortized = mult_frac(USEC_PER_SEC, pipe->src.y,
 			fps * v_total);
 		prefill_us += prefill_amortized;
@@ -2371,7 +2372,6 @@ struct mdss_mdp_ctl *mdss_mdp_ctl_alloc(struct mdss_data_type *mdata,
 			mutex_init(&ctl->offlock);
 			mutex_init(&ctl->flush_lock);
 			mutex_init(&ctl->rsrc_lock);
-			mutex_init(&ctl->event_lock);
 			spin_lock_init(&ctl->spin_lock);
 			BLOCKING_INIT_NOTIFIER_HEAD(&ctl->notifier_head);
 			pr_debug("alloc ctl_num=%d\n", ctl->num);
@@ -3943,7 +3943,6 @@ int mdss_mdp_ctl_intf_event(struct mdss_mdp_ctl *ctl, int event, void *arg,
 {
 	struct mdss_panel_data *pdata;
 	int rc = 0;
-	bool need_lock = false;
 
 	if (!ctl || !ctl->panel_data)
 		return -ENODEV;
@@ -3961,25 +3960,12 @@ int mdss_mdp_ctl_intf_event(struct mdss_mdp_ctl *ctl, int event, void *arg,
 
 	pr_debug("sending ctl=%d event=%d flag=0x%x\n", ctl->num, event, flags);
 
-	switch (event) {
-	case MDSS_EVENT_LINK_READY:
-	case MDSS_EVENT_PANEL_OFF:
-	case MDSS_EVENT_PANEL_VDDIO_SWITCH_ON:
-	case MDSS_EVENT_PANEL_VDDIO_SWITCH_OFF:
-		need_lock = true;
-		break;
-	}
-
-	if (need_lock)
-		mutex_lock(&ctl->event_lock);
 	do {
 		if (pdata->event_handler)
 			rc = pdata->event_handler(pdata, event, arg);
 		pdata = pdata->next;
 	} while (rc == 0 && pdata && pdata->active &&
 		!(flags & CTL_INTF_EVENT_FLAG_SKIP_BROADCAST));
-	if (need_lock)
-		mutex_unlock(&ctl->event_lock);
 
 	return rc;
 }
@@ -4342,9 +4328,11 @@ void mdss_mdp_check_ctl_reset_status(struct mdss_mdp_ctl *ctl)
 		return;
 
 	pr_debug("hw ctl reset is set for ctl:%d\n", ctl->num);
-	status = mdss_mdp_poll_ctl_reset_status(ctl, 5);
+	/* poll for at least ~1 frame */
+	status = mdss_mdp_poll_ctl_reset_status(ctl, 320);
 	if (status) {
-		pr_err("hw recovery is not complete for ctl:%d\n", ctl->num);
+		pr_err("hw recovery is not complete for ctl:%d status:0x%x\n",
+			ctl->num, status);
 		MDSS_XLOG_TOUT_HANDLER("mdp", "vbif", "vbif_nrt", "dbg_bus",
 			"vbif_dbg_bus", "panic");
 	}
@@ -5531,7 +5519,9 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg,
 		} else {
 			sctl_flush_bits = sctl->flush_bits;
 		}
+		sctl->commit_in_progress = true;
 	}
+	ctl->commit_in_progress = true;
 	ctl_flush_bits = ctl->flush_bits;
 
 	ATRACE_END("postproc_programming");
@@ -5671,11 +5661,16 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg,
 
 	ATRACE_BEGIN("flush_kickoff");
 	mdss_mdp_ctl_write(ctl, MDSS_MDP_REG_CTL_FLUSH, ctl_flush_bits);
-	if (sctl && sctl_flush_bits) {
-		mdss_mdp_ctl_write(sctl, MDSS_MDP_REG_CTL_FLUSH,
-			sctl_flush_bits);
-		sctl->flush_bits = 0;
+	if (sctl) {
+		if (sctl_flush_bits) {
+			mdss_mdp_ctl_write(sctl, MDSS_MDP_REG_CTL_FLUSH,
+				sctl_flush_bits);
+			sctl->flush_bits = 0;
+		}
+		sctl->commit_in_progress = false;
 	}
+	ctl->commit_in_progress = false;
+
 	MDSS_XLOG(ctl->intf_num, ctl_flush_bits, sctl_flush_bits,
 		split_lm_valid);
 	wmb();

@@ -20,5 +20,11 @@ void mmc_retune_hold(struct mmc_host *host);
 void mmc_retune_release(struct mmc_host *host);
 int mmc_retune(struct mmc_host *host);
 
+void mmc_retune_enable(struct mmc_host *host);
+void mmc_retune_disable(struct mmc_host *host);
+void mmc_retune_hold(struct mmc_host *host);
+void mmc_retune_release(struct mmc_host *host);
+int mmc_retune(struct mmc_host *host);
+
 #endif
 

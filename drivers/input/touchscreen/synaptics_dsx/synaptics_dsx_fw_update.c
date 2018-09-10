@@ -681,10 +681,12 @@ static enum flash_area fwu_go_nogo(struct image_header_data *header)
 			goto exit;
 		}
 
-		while (strptr[index] >= '0' && strptr[index] <= '9') {
+		while ((index < MAX_FIRMWARE_ID_LEN - 1) && strptr[index] >= '0'
+						&& strptr[index] <= '9') {
 			firmware_id[index] = strptr[index];
 			index++;
 		}
+		firmware_id[index] = '\0';
 
 		retval = sstrtoul(firmware_id, 10, &image_fw_id);
 		kfree(firmware_id);
@@ -1853,13 +1855,6 @@ static ssize_t fwu_sysfs_image_name_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	ssize_t retval;
-
-	if (!buf || count > MAX_IMAGE_NAME_LEN) {
-		dev_err(fwu->rmi4_data->pdev->dev.parent,
-				"%s: Failed to copy image file name\n",
-				__func__);
-		return -EINVAL;
-	}
 
 	if (!mutex_trylock(&dsx_fwu_sysfs_mutex))
 		return -EBUSY;

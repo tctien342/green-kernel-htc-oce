@@ -53,6 +53,7 @@ obj-$(CONFIG_MSM_QMI_INTERFACE) += qmi_interface.o
 obj-$(CONFIG_MSM_IPC_ROUTER_SMD_XPRT) += ipc_router_smd_xprt.o
 obj-$(CONFIG_MSM_IPC_ROUTER_HSIC_XPRT) += ipc_router_hsic_xprt.o
 obj-$(CONFIG_MSM_IPC_ROUTER_MHI_XPRT) += ipc_router_mhi_xprt.o
+obj-$(CONFIG_MSM_IPC_ROUTER_MHI_DEV_XPRT) += ipc_router_mhi_dev_xprt.o
 obj-$(CONFIG_MSM_IPC_ROUTER_GLINK_XPRT) += ipc_router_glink_xprt.o
 obj-$(CONFIG_MSM_SYSMON_GLINK_COMM) += sysmon-glink.o sysmon-qmi.o
 obj-$(CONFIG_MSM_SHARED_HEAP_ACCESS) += shared_memory.o
@@ -67,7 +68,6 @@ else
 obj-$(CONFIG_HW_PERF_EVENTS) += perf_event_l2.o
 endif
 obj-$(CONFIG_MSM_RPM_LOG) += rpm_log.o
-obj-y += rpm_stats_ver.o
 obj-$(CONFIG_MSM_JTAG) += jtag-fuse.o jtag.o
 obj-$(CONFIG_MSM_JTAG_MM) +=  jtag-fuse.o jtag-mm.o
 obj-$(CONFIG_MSM_JTAGV8) += jtag-fuse.o jtagv8.o jtagv8-etm.o
@@ -83,7 +83,6 @@ obj-$(CONFIG_MSM_SCM_ERRATA) += scm-errata.o
 obj-$(CONFIG_MSM_PFE_WA) += pfe-wa.o
 obj-$(CONFIG_MSM_PERFORMANCE) += msm_performance.o
 obj-$(CONFIG_ARCH_MSM8996) += msm_cpu_voltage.o
-obj-$(CONFIG_FPR_FPC)  += htc_smi.o
 obj-$(CONFIG_MSM_POWER) += msm_power.o
 obj-$(CONFIG_MSM_BGCOM) += bgcom_spi.o
 obj-$(CONFIG_WCD_DSP_GLINK) += wcd-dsp-glink.o

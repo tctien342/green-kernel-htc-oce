@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2016, 2018 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -531,12 +531,12 @@ static bool msm_mpm_interrupts_detectable(int d, bool from_idle)
 	if (debug_mask && !ret) {
 		int i = 0;
 		i = find_first_bit(irq_bitmap, unlisted->size);
-		pr_warn("%s(): %s preventing system sleep modes during %s\n",
+		pr_info("%s(): %s preventing system sleep modes during %s\n",
 				__func__, unlisted->domain_name,
 				from_idle ? "idle" : "suspend");
 
 		while (i < unlisted->size) {
-			pr_warn("\thwirq: %d\n", i);
+			pr_info("\thwirq: %d\n", i);
 			i = find_next_bit(irq_bitmap, unlisted->size, i + 1);
 		}
 	}
@@ -608,24 +608,13 @@ void msm_mpm_exit_sleep(bool from_idle)
 			unsigned int apps_irq = msm_mpm_get_irq_m2a(mpm_irq);
 			struct irq_desc *desc = apps_irq ?
 				irq_to_desc(apps_irq) : NULL;
+			struct irq_chip *chip = NULL;
 
-#ifdef CONFIG_HTC_POWER_DEBUG
-			const char *name = "null";
-			if (desc == NULL)
-				name = "stray irq";
-			else if (desc->action && desc->action->name)
-				name = desc->action->name;
+			if (desc)
+				chip = desc->irq_data.chip;
 
-			if(strcmp(desc->irq_data.chip->name,"msmgpio")==0)
-				pr_info("[WAKEUP] Resume caused by msmgpio-%lu\n", desc->irq_data.hwirq);
-
-			pr_info("%s: irq %d tirggered %s-%lu-%s", __func__,
-						apps_irq,
-						irq_desc_get_chip(desc)->name,
-						desc->irq_data.hwirq,
-						name);
-#endif
-			if (desc && !irqd_is_level_type(&desc->irq_data)) {
+			if (desc && !irqd_is_level_type(&desc->irq_data) &&
+				(!(chip && !strcmp(chip->name, "msmgpio")))) {
 				irq_set_pending(apps_irq);
 				if (from_idle) {
 					raw_spin_lock(&desc->lock);
